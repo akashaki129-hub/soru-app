@@ -851,6 +851,7 @@ function MealPlanSection({
           title="Personalised nutrition meal plans"
           text="Tell Soru your goal, allergies, budget, and food style. AI creates a chef-ready recommendation."
         />
+        <AiDisclaimer />
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <Field label="Primary goal">
             <input
@@ -1044,6 +1045,7 @@ function LunchboxSection({
           title="Kids lunchbox customization"
           text="AI turns kids’ preferences into healthier chef-ready lunchbox recommendations."
         />
+        <AiDisclaimer />
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <Field label="Child age">
             <input
@@ -1168,6 +1170,15 @@ function OrdersSection({
         })}
       </div>
     </section>
+  );
+}
+
+function AiDisclaimer() {
+  return (
+    <div className="mt-5 rounded-2xl border border-primary/25 bg-primary/10 p-4 text-sm leading-6 text-foreground">
+      Soru’s AI suggestions provide general food guidance and are not medical or clinical nutrition
+      advice.
+    </div>
   );
 }
 

@@ -1,9 +1,7 @@
-const CACHE_NAME = "soru-mobile-shell-v2";
+const CACHE_NAME = "soru-public-assets-v3";
 const APP_SHELL = [
   "/",
-  "/soru-auth",
-  "/app",
-  "/chef-studio",
+  "/offline.html",
   "/soru-icon.svg",
   "/soru-icon-192.png",
   "/soru-icon-256.png",
@@ -36,15 +34,41 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api") || url.pathname.startsWith("/functions")) return;
+  if (
+    url.pathname.startsWith("/app") ||
+    url.pathname.startsWith("/chef-studio") ||
+    url.pathname.startsWith("/admin") ||
+    url.pathname.startsWith("/soru-auth") ||
+    url.pathname.startsWith("/auth") ||
+    url.pathname.startsWith("/api") ||
+    url.pathname.startsWith("/functions") ||
+    url.pathname.includes("/supabase")
+  ) {
+    return;
+  }
+
+  const isStaticAsset =
+    url.pathname.startsWith("/assets/") ||
+    url.pathname.startsWith("/soru-icon") ||
+    url.pathname === "/manifest.webmanifest" ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".png") ||
+    url.pathname.endsWith(".jpg") ||
+    url.pathname.endsWith(".svg") ||
+    url.pathname === "/" ||
+    url.pathname === "/offline.html";
+
+  if (!isStaticAsset) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
+        if (!response.ok) return response;
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/"))),
+      .catch(() => caches.match(request).then((cached) => cached || caches.match("/offline.html"))),
   );
 });

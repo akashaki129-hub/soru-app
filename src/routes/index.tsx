@@ -25,7 +25,7 @@ import professionalLunch from "@/assets/professional-lunch.jpg";
 import chefCooking from "@/assets/chef-cooking.jpg";
 import { BrandLogo } from "@/components/brand-logo";
 import { MarketFeedbackSurvey } from "@/components/market-feedback-survey";
-import { supabase } from "@/integrations/supabase/client";
+import { submitPublicLead } from "@/lib/leads";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -706,20 +706,48 @@ function Enrollment() {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const payload = {
-      name: String(data.get("name") || "").trim(),
+      full_name: String(data.get("name") || "").trim(),
       email: String(data.get("email") || "").trim(),
       phone: String(data.get("phone") || "").trim(),
       city: String(data.get("city") || "").trim(),
       role: String(data.get("role") || "").trim(),
       comments: String(data.get("comments") || "").trim() || null,
+      consent: data.get("consent") === "on",
+      website: String(data.get("website") || "").trim(),
     };
 
+    if (!payload.consent) {
+      toast.error("Please agree to Soru’s Privacy Policy before submitting.");
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.from("waitlist_entries").insert(payload);
+    let saveError = "";
+    try {
+      await submitPublicLead({
+        full_name: payload.full_name,
+        email: payload.email,
+        phone: payload.phone,
+        city: payload.city,
+        role:
+          payload.role.toLowerCase().includes("chef") ||
+          payload.role.toLowerCase().includes("student") ||
+          payload.role.toLowerCase().includes("homemaker") ||
+          payload.role.toLowerCase().includes("caterer")
+            ? "chef"
+            : "customer",
+        source: "homepage_waitlist",
+        notes: payload.comments,
+        campaign: "landing_waitlist",
+        consent: payload.consent,
+        website: payload.website,
+      });
+    } catch (error) {
+      saveError = error instanceof Error ? error.message : "We couldn't save your waitlist entry.";
+    }
     setLoading(false);
-    if (error) {
-      console.error("Waitlist submission failed", error);
-      toast.error("We couldn't save your waitlist entry. Please try again.");
+    if (saveError) {
+      toast.error(saveError);
       return;
     }
     setSubmitted(true);
@@ -781,6 +809,7 @@ function Enrollment() {
                 </div>
               ) : (
                 <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+                  <input name="website" tabIndex={-1} autoComplete="off" className="hidden" />
                   <Field label="Name" name="name" placeholder="Your name" required />
                   <Field
                     label="Email"
@@ -816,6 +845,16 @@ function Enrollment() {
                       placeholder="Customers: tell us what you need. Chefs: share your goals, ideas, or support you’re looking for."
                     />
                   </div>
+                  <label className="flex items-start gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 text-sm leading-6 text-white/75 sm:col-span-2">
+                    <input required name="consent" type="checkbox" className="mt-1 size-4" />
+                    <span>
+                      I agree to Soru’s{" "}
+                      <a href="/privacy" className="font-semibold text-white underline">
+                        Privacy Policy
+                      </a>{" "}
+                      and consent to being contacted regarding the pilot.
+                    </span>
+                  </label>
                   <button
                     type="submit"
                     disabled={loading}
@@ -862,11 +901,20 @@ function Footer() {
             <a href="/enroll" className="hover:text-foreground">
               For customers
             </a>
-            <a href="#" className="hover:text-foreground">
+            <a href="/privacy" className="hover:text-foreground">
               Privacy
             </a>
-            <a href="#" className="hover:text-foreground">
+            <a href="/terms" className="hover:text-foreground">
               Terms
+            </a>
+            <a href="/refund-policy" className="hover:text-foreground">
+              Refunds
+            </a>
+            <a href="/food-safety" className="hover:text-foreground">
+              Food safety
+            </a>
+            <a href="/ai-food-guidance" className="hover:text-foreground">
+              AI guidance
             </a>
           </nav>
           <div className="flex items-center gap-2" aria-label="Follow Soru">

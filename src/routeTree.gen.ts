@@ -9,23 +9,48 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SoruAuthRouteImport } from './routes/soru-auth'
+import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as JoinAsChefRouteImport } from './routes/join-as-chef'
+import { Route as FoodSafetyRouteImport } from './routes/food-safety'
 import { Route as EnrollRouteImport } from './routes/enroll'
 import { Route as ChefStudioRouteImport } from './routes/chef-studio'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as AiFoodGuidanceRouteImport } from './routes/ai-food-guidance'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SoruAuthRoute = SoruAuthRouteImport.update({
   id: '/soru-auth',
   path: '/soru-auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RefundPolicyRoute = RefundPolicyRouteImport.update({
+  id: '/refund-policy',
+  path: '/refund-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JoinAsChefRoute = JoinAsChefRouteImport.update({
   id: '/join-as-chef',
   path: '/join-as-chef',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FoodSafetyRoute = FoodSafetyRouteImport.update({
+  id: '/food-safety',
+  path: '/food-safety',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EnrollRoute = EnrollRouteImport.update({
@@ -48,6 +73,11 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiFoodGuidanceRoute = AiFoodGuidanceRouteImport.update({
+  id: '/ai-food-guidance',
+  path: '/ai-food-guidance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -62,80 +92,122 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/ai-food-guidance': typeof AiFoodGuidanceRoute
   '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/chef-studio': typeof ChefStudioRoute
   '/enroll': typeof EnrollRoute
+  '/food-safety': typeof FoodSafetyRoute
   '/join-as-chef': typeof JoinAsChefRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
   '/soru-auth': typeof SoruAuthRoute
+  '/terms': typeof TermsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/ai-food-guidance': typeof AiFoodGuidanceRoute
   '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/chef-studio': typeof ChefStudioRoute
   '/enroll': typeof EnrollRoute
+  '/food-safety': typeof FoodSafetyRoute
   '/join-as-chef': typeof JoinAsChefRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
   '/soru-auth': typeof SoruAuthRoute
+  '/terms': typeof TermsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/ai-food-guidance': typeof AiFoodGuidanceRoute
   '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/chef-studio': typeof ChefStudioRoute
   '/enroll': typeof EnrollRoute
+  '/food-safety': typeof FoodSafetyRoute
   '/join-as-chef': typeof JoinAsChefRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
   '/soru-auth': typeof SoruAuthRoute
+  '/terms': typeof TermsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/admin'
+    | '/ai-food-guidance'
     | '/app'
     | '/auth'
     | '/chef-studio'
     | '/enroll'
+    | '/food-safety'
     | '/join-as-chef'
+    | '/privacy'
+    | '/refund-policy'
     | '/soru-auth'
+    | '/terms'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
+    | '/ai-food-guidance'
     | '/app'
     | '/auth'
     | '/chef-studio'
     | '/enroll'
+    | '/food-safety'
     | '/join-as-chef'
+    | '/privacy'
+    | '/refund-policy'
     | '/soru-auth'
+    | '/terms'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/ai-food-guidance'
     | '/app'
     | '/auth'
     | '/chef-studio'
     | '/enroll'
+    | '/food-safety'
     | '/join-as-chef'
+    | '/privacy'
+    | '/refund-policy'
     | '/soru-auth'
+    | '/terms'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AiFoodGuidanceRoute: typeof AiFoodGuidanceRoute
   AppRoute: typeof AppRoute
   AuthRoute: typeof AuthRoute
   ChefStudioRoute: typeof ChefStudioRoute
   EnrollRoute: typeof EnrollRoute
+  FoodSafetyRoute: typeof FoodSafetyRoute
   JoinAsChefRoute: typeof JoinAsChefRoute
+  PrivacyRoute: typeof PrivacyRoute
+  RefundPolicyRoute: typeof RefundPolicyRoute
   SoruAuthRoute: typeof SoruAuthRoute
+  TermsRoute: typeof TermsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/soru-auth': {
       id: '/soru-auth'
       path: '/soru-auth'
@@ -143,11 +215,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SoruAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/refund-policy': {
+      id: '/refund-policy'
+      path: '/refund-policy'
+      fullPath: '/refund-policy'
+      preLoaderRoute: typeof RefundPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/join-as-chef': {
       id: '/join-as-chef'
       path: '/join-as-chef'
       fullPath: '/join-as-chef'
       preLoaderRoute: typeof JoinAsChefRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/food-safety': {
+      id: '/food-safety'
+      path: '/food-safety'
+      fullPath: '/food-safety'
+      preLoaderRoute: typeof FoodSafetyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/enroll': {
@@ -178,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ai-food-guidance': {
+      id: '/ai-food-guidance'
+      path: '/ai-food-guidance'
+      fullPath: '/ai-food-guidance'
+      preLoaderRoute: typeof AiFoodGuidanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -198,12 +298,17 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AiFoodGuidanceRoute: AiFoodGuidanceRoute,
   AppRoute: AppRoute,
   AuthRoute: AuthRoute,
   ChefStudioRoute: ChefStudioRoute,
   EnrollRoute: EnrollRoute,
+  FoodSafetyRoute: FoodSafetyRoute,
   JoinAsChefRoute: JoinAsChefRoute,
+  PrivacyRoute: PrivacyRoute,
+  RefundPolicyRoute: RefundPolicyRoute,
   SoruAuthRoute: SoruAuthRoute,
+  TermsRoute: TermsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

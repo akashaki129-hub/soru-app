@@ -9,7 +9,13 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"Unit test harness pending: install Vitest when network access is available\"",
+    "test:watch": "echo \"Unit test watch pending: install Vitest when network access is available\"",
+    "test:e2e": "echo \"E2E harness pending: install Playwright when network access is available\"",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

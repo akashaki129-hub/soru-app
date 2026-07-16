@@ -8,8 +8,10 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+node_modules.partial
 dist
 dist-ssr
+.vercel
 .output
 .vinxi
 .tanstack/**

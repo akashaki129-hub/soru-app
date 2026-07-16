@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 import { BrandLogo } from "@/components/brand-logo";
-import { isValidPhoneNumber, normalizePhone } from "@/lib/validation";
+import { submitPublicLead } from "@/lib/leads";
+import { isValidPhoneNumber } from "@/lib/validation";
 
 export const Route = createFileRoute("/enroll")({
   head: () => ({
@@ -25,6 +25,9 @@ const schema = z.object({
   email: z.string().trim().email("Valid email required").max(255),
   preferred_service: z.string().min(1, "Please select a service"),
   comments: z.string().trim().max(1500, "Please keep your note under 1,500 characters").optional(),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: "Please agree to Soru’s Privacy Policy before submitting." }),
+  }),
 });
 
 const services = [
@@ -43,6 +46,7 @@ function EnrollPage() {
     email: "",
     preferred_service: "",
     comments: "",
+    consent: false,
   });
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -55,19 +59,36 @@ function EnrollPage() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("customer_enrollments").insert({
-      ...parsed.data,
-      phone: normalizePhone(parsed.data.phone),
-      comments: parsed.data.comments || null,
-    });
+    let saveError = "";
+    try {
+      await submitPublicLead({
+        full_name: parsed.data.name,
+        phone: parsed.data.phone,
+        email: parsed.data.email,
+        role: "customer",
+        source: "customer_enrollment",
+        preferred_service: parsed.data.preferred_service,
+        notes: parsed.data.comments || null,
+        consent: parsed.data.consent,
+      });
+    } catch (error) {
+      saveError = error instanceof Error ? error.message : "Could not submit.";
+    }
     setLoading(false);
-    if (error) {
-      toast.error("Could not submit. Please try again.");
+    if (saveError) {
+      toast.error(saveError);
       return;
     }
     setDone(true);
     toast.success("You're in! We'll be in touch soon.");
-    setForm({ name: "", phone: "", email: "", preferred_service: "", comments: "" });
+    setForm({
+      name: "",
+      phone: "",
+      email: "",
+      preferred_service: "",
+      comments: "",
+      consent: false,
+    });
   }
 
   return (
@@ -164,6 +185,10 @@ function EnrollPage() {
                   placeholder="Share your food goals, dietary needs, delivery preferences, or anything you'd like us to build."
                 />
               </Field>
+              <ConsentBox
+                checked={form.consent}
+                onChange={(checked) => setForm({ ...form, consent: checked })}
+              />
               <button
                 type="submit"
                 disabled={loading}
@@ -191,6 +216,33 @@ function EnrollPage() {
         .input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 18%, transparent); }
       `}</style>
     </div>
+  );
+}
+
+function ConsentBox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4 text-sm leading-6 text-muted-foreground">
+      <input
+        required
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-1 size-4"
+      />
+      <span>
+        I agree to Soru’s{" "}
+        <Link to="/privacy" className="font-semibold text-foreground underline">
+          Privacy Policy
+        </Link>{" "}
+        and consent to being contacted regarding the pilot.
+      </span>
+    </label>
   );
 }
 
