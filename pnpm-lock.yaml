@@ -92,6 +92,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.108.2
         version: 2.108.2
+      '@tanstack/query-core':
+        specifier: ^5.101.0
+        version: 5.101.0
       '@tailwindcss/vite':
         specifier: ^4.2.1
         version: 4.3.1(vite@7.3.5(@types/node@22.20.0)(jiti@1.21.7)(lightningcss@1.32.0))
