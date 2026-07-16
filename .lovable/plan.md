@@ -1,0 +1,1 @@
+Look up the user id for `akashaki129@gmail.com` in `auth.users` and insert a row into `public.user_roles` with role `admin` (skipped if it already exists). After this, signing in at `/auth` with that email unlocks `/admin`.

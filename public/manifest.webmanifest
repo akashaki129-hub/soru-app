@@ -1,0 +1,52 @@
+{
+  "name": "Soru",
+  "short_name": "Soru",
+  "description": "Chef-powered meals, subscriptions, lunchboxes, and personalised nutrition plans.",
+  "start_url": "/soru-auth?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFDF8",
+  "theme_color": "#F5B51B",
+  "categories": ["food", "health", "lifestyle"],
+  "icons": [
+    {
+      "src": "/soru-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/soru-icon-256.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/soru-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/soru-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Customer app",
+      "short_name": "Meals",
+      "url": "/app",
+      "icons": [{ "src": "/soru-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Chef Studio",
+      "short_name": "Chef",
+      "url": "/chef-studio",
+      "icons": [{ "src": "/soru-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

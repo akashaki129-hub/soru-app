@@ -1,0 +1,213 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-cream: var(--cream);
+  --color-spice: var(--spice);
+  --color-leaf: var(--leaf);
+  --color-ink: var(--ink);
+
+  --font-display: "Cormorant Garamond", "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Manrope", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-soft: 0 1px 2px oklch(0.2 0.05 40 / 0.04), 0 8px 30px oklch(0.2 0.05 40 / 0.08);
+  --shadow-glow: 0 10px 40px oklch(0.55 0.18 40 / 0.25);
+}
+
+:root {
+  --radius: 1rem;
+
+  /* Soru brand palette: luminous amber, clean white and confident black. */
+  --background: oklch(0.99 0.004 85);
+  --foreground: oklch(0.15 0.008 75);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.008 75);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.008 75);
+
+  --primary: oklch(0.82 0.17 78);
+  --primary-foreground: oklch(0.13 0.006 75);
+  --secondary: oklch(0.965 0.035 82);
+  --secondary-foreground: oklch(0.22 0.012 75);
+  --muted: oklch(0.955 0.008 80);
+  --muted-foreground: oklch(0.47 0.012 75);
+  --accent: oklch(0.88 0.13 82);
+  --accent-foreground: oklch(0.13 0.006 75);
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0.01 165);
+  --border: oklch(0.9 0.008 80);
+  --input: oklch(0.88 0.01 80);
+  --ring: oklch(0.82 0.17 78);
+
+  --cream: oklch(0.99 0.004 85);
+  --spice: oklch(0.82 0.17 78);
+  --leaf: oklch(0.82 0.17 78);
+  --ink: oklch(0.13 0.006 75);
+  --paper: oklch(1 0 0);
+  --saffron: oklch(0.82 0.17 78);
+  --sage: oklch(0.73 0.15 76);
+  --terracotta: oklch(0.13 0.006 75);
+
+  --chart-1: oklch(0.82 0.17 78);
+  --chart-2: oklch(0.68 0.15 70);
+  --chart-3: oklch(0.25 0.01 75);
+  --chart-4: oklch(0.9 0.08 83);
+  --chart-5: oklch(0.48 0.08 72);
+
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.15 0.008 75);
+  --sidebar-primary: oklch(0.82 0.17 78);
+  --sidebar-primary-foreground: oklch(0.13 0.006 75);
+  --sidebar-accent: oklch(0.965 0.035 82);
+  --sidebar-accent-foreground: oklch(0.22 0.012 75);
+  --sidebar-border: oklch(0.9 0.008 80);
+  --sidebar-ring: oklch(0.82 0.17 78);
+}
+
+.dark {
+  --background: oklch(0.16 0.02 50);
+  --foreground: oklch(0.97 0.01 80);
+  --card: oklch(0.22 0.025 50);
+  --card-foreground: oklch(0.97 0.01 80);
+  --popover: oklch(0.22 0.025 50);
+  --popover-foreground: oklch(0.97 0.01 80);
+  --primary: oklch(0.7 0.18 45);
+  --primary-foreground: oklch(0.16 0.02 50);
+  --secondary: oklch(0.28 0.03 50);
+  --secondary-foreground: oklch(0.97 0.01 80);
+  --muted: oklch(0.28 0.03 50);
+  --muted-foreground: oklch(0.72 0.02 70);
+  --accent: oklch(0.55 0.1 155);
+  --accent-foreground: oklch(0.16 0.02 50);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.7 0.18 45);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01";
+    letter-spacing: -0.02em;
+  }
+  ::selection {
+    background: oklch(0.83 0.14 78 / 0.35);
+  }
+}
+
+@utility container-x {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: max(1rem, env(safe-area-inset-left));
+  max-width: 80rem;
+}
+
+@utility mobile-app-screen {
+  min-height: 100svh;
+  padding-bottom: max(5.5rem, env(safe-area-inset-bottom));
+}
+
+@utility mobile-tabbar {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 35px oklch(0.2 0.04 80 / 0.1);
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility grain-bg {
+  background-image:
+    radial-gradient(oklch(0.82 0.17 78 / 0.08) 1px, transparent 1px),
+    radial-gradient(oklch(0.15 0.008 75 / 0.035) 1px, transparent 1px);
+  background-size:
+    28px 28px,
+    36px 36px;
+  background-position:
+    0 0,
+    14px 18px;
+}
+
+@utility hero-mesh {
+  background-image:
+    radial-gradient(circle at 15% 25%, oklch(0.82 0.17 78 / 0.22), transparent 28%),
+    radial-gradient(circle at 85% 70%, oklch(0.82 0.17 78 / 0.12), transparent 32%),
+    linear-gradient(oklch(1 0 0 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 0.025) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    46px 46px,
+    46px 46px;
+}
+
+@utility service-card {
+  position: relative;
+  min-height: 26rem;
+  overflow: hidden;
+  border-radius: 2rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  padding: 1.75rem;
+  box-shadow: var(--shadow-soft);
+  transition:
+    transform 300ms ease,
+    box-shadow 300ms ease;
+}
+
+@media (min-width: 768px) {
+  .service-card {
+    padding: 2.25rem;
+  }
+}
+
+.service-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 55px oklch(0.2 0.04 80 / 0.11);
+}
