@@ -916,6 +916,9 @@ function Footer() {
             <a href="/ai-food-guidance" className="hover:text-foreground">
               AI guidance
             </a>
+            <a href="mailto:hello@soruindia.com" className="hover:text-foreground">
+              hello@soruindia.com
+            </a>
           </nav>
           <div className="flex items-center gap-2" aria-label="Follow Soru">
             <SocialLink href="https://www.instagram.com/soru.india/" label="Soru on Instagram">
