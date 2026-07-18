@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { ArrowRight, ChefHat, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRight, ChefHat, Instagram, Linkedin, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -317,10 +317,64 @@ function SoruAuthPage() {
             </>
           )}
         </section>
+
+        <AppContactCard />
       </main>
 
       <style>{inputStyles}</style>
     </div>
+  );
+}
+
+function AppContactCard() {
+  return (
+    <section className="rounded-[1.6rem] border border-border bg-card p-5 shadow-soft md:col-span-2 md:rounded-[2rem] md:p-7">
+      <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            Contact us
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold">Need help with Soru?</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Reach us for customer support, chef onboarding, partnerships, or feedback.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3 md:min-w-[34rem]">
+          <AppContactLink href="mailto:hello@soruindia.com" icon={<Mail />} label="Email" value="hello@soruindia.com" />
+          <AppContactLink href="https://www.instagram.com/soru.india/" icon={<Instagram />} label="Instagram" value="@soru.india" />
+          <AppContactLink href="https://www.linkedin.com/company/soru-india" icon={<Linkedin />} label="LinkedIn" value="Soru India" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AppContactLink({
+  href,
+  icon,
+  label,
+  value,
+}: {
+  href: string;
+  icon: React.ReactElement;
+  label: string;
+  value: string;
+}) {
+  return (
+    <a
+      href={href}
+      target={href.startsWith("http") ? "_blank" : undefined}
+      rel={href.startsWith("http") ? "noreferrer" : undefined}
+      className="rounded-2xl border border-border bg-background p-4 transition hover:border-primary/40 hover:bg-muted/40"
+    >
+      <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        {icon}
+      </span>
+      <span className="mt-3 block text-[0.68rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="mt-1 block break-words text-xs font-semibold text-foreground">{value}</span>
+    </a>
   );
 }
 
