@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   FileText,
   LogOut,
+  Mail,
   Plus,
   Store,
 } from "lucide-react";
@@ -153,6 +154,12 @@ function ChefStudioPage() {
             <BrandLogo />
           </Link>
           <div className="flex items-center gap-3">
+            <a
+              href="mailto:hello@soruindia.com"
+              className="hidden items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted md:inline-flex"
+            >
+              <Mail className="size-4" /> Contact
+            </a>
             <Link
               to="/app"
               className="hidden rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted sm:inline-flex"

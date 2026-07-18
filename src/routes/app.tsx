@@ -6,6 +6,7 @@ import {
   ClipboardList,
   HeartPulse,
   LogOut,
+  Mail,
   MapPin,
   PackageCheck,
   Search,
@@ -292,6 +293,12 @@ function AppHeader({ profile, onSignOut }: { profile: Profile | null; onSignOut:
           <BrandLogo />
         </Link>
         <div className="flex items-center gap-3">
+          <a
+            href="mailto:hello@soruindia.com"
+            className="hidden items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted md:inline-flex"
+          >
+            <Mail className="size-4" /> Contact
+          </a>
           <span className="hidden text-sm text-muted-foreground sm:inline">
             {profile?.full_name || "Soru member"}
           </span>

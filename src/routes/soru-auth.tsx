@@ -137,6 +137,9 @@ function SoruAuthPage() {
             <Link to="/chef-studio" className="hover:text-foreground">
               Chef studio
             </Link>
+            <a href="mailto:hello@soruindia.com" className="hover:text-foreground">
+              hello@soruindia.com
+            </a>
           </div>
         </div>
       </header>
@@ -305,6 +308,12 @@ function SoruAuthPage() {
                   <ArrowRight className="size-4" />
                 </button>
               </form>
+              <p className="mt-5 text-center text-xs text-muted-foreground">
+                Need help?{" "}
+                <a href="mailto:hello@soruindia.com" className="font-semibold text-foreground">
+                  hello@soruindia.com
+                </a>
+              </p>
             </>
           )}
         </section>
