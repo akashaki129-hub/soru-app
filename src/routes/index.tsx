@@ -10,6 +10,7 @@ import {
   HeartHandshake,
   Instagram,
   Linkedin,
+  Mail,
   MapPin,
   ShieldCheck,
   Sparkles,
@@ -135,6 +136,7 @@ function Landing() {
         <Services />
         <WhySoru />
         <Enrollment />
+        <ContactUsSection />
       </main>
       <Footer />
       <MarketFeedbackSurvey />
@@ -255,6 +257,9 @@ function Nav() {
           </a>
           <a href="/app" className="transition hover:text-foreground">
             Soru app
+          </a>
+          <a href="#contact" className="transition hover:text-foreground">
+            Contact
           </a>
         </nav>
         <a
@@ -869,6 +874,82 @@ function Enrollment() {
         </div>
       </div>
     </section>
+  );
+}
+
+function ContactUsSection() {
+  return (
+    <section id="contact" className="bg-background py-16 md:py-24">
+      <div className="container-x">
+        <div className="rounded-[2rem] border border-border bg-card p-6 shadow-soft md:rounded-[2.5rem] md:p-10">
+          <div className="flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+            <div className="max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
+                Contact us
+              </p>
+              <h2 className="mt-3 font-display text-4xl font-medium tracking-tight md:text-5xl">
+                Talk to Soru.
+              </h2>
+              <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
+                For customer questions, chef onboarding, partnerships, or investor conversations,
+                reach us directly.
+              </p>
+            </div>
+            <div className="grid w-full gap-3 sm:grid-cols-3 lg:max-w-2xl">
+              <ContactLink
+                href="mailto:hello@soruindia.com"
+                icon={Mail}
+                label="Email"
+                value="hello@soruindia.com"
+              />
+              <ContactLink
+                href="https://www.instagram.com/soru.india/"
+                icon={Instagram}
+                label="Instagram"
+                value="@soru.india"
+              />
+              <ContactLink
+                href="https://www.linkedin.com/company/soru-india"
+                icon={Linkedin}
+                label="LinkedIn"
+                value="Soru India"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ContactLink({
+  href,
+  icon: Icon,
+  label,
+  value,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <a
+      href={href}
+      target={href.startsWith("http") ? "_blank" : undefined}
+      rel={href.startsWith("http") ? "noreferrer" : undefined}
+      className="group rounded-3xl border border-border bg-background p-5 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-soft"
+    >
+      <span className="grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary">
+        <Icon className="size-5" />
+      </span>
+      <span className="mt-4 block text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="mt-1 block break-words text-sm font-semibold text-foreground group-hover:text-primary">
+        {value}
+      </span>
+    </a>
   );
 }
 
