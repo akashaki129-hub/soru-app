@@ -151,7 +151,7 @@ function AppGateway() {
       <main className="container-x relative flex min-h-screen items-center py-10">
         <section className="mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1fr_.82fr]">
           <div>
-            <BrandLogo className="brightness-0 invert" />
+            <BrandLogo className="text-white" />
             <Pill dark>
               <Smartphone className="size-3.5" /> Soru mobile app
             </Pill>
