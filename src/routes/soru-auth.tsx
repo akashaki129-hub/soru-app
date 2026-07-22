@@ -225,7 +225,7 @@ function SoruAuthPage() {
               </div>
 
               <form onSubmit={submit} className="mt-6 space-y-4">
-                <Field label="I am joining as">
+                <Field label={mode === "signin" ? "Logging in as" : "I am joining as"}>
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value as AppRole)}
