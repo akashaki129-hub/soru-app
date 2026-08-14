@@ -7,6 +7,13 @@ type AiPayload = {
   payload: Record<string, unknown>;
 };
 
+type SoruTrainingContext = {
+  profile: Record<string, unknown> | null;
+  recent_meal_plan_requests: Array<Record<string, unknown>>;
+  recent_lunchbox_requests: Array<Record<string, unknown>>;
+  available_menu_items: Array<Record<string, unknown>>;
+};
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, content-type",
@@ -148,6 +155,202 @@ function promptFor(kind: RecommendationKind, payload: Record<string, unknown>) {
   ].join("\n");
 }
 
+const soruTrainingPrinciples = [
+  "Soru is a chef-powered food services marketplace for India.",
+  "Soru should recommend affordable, trusted, chef-made everyday meals.",
+  "Soru supports verified skilled cooks, home chefs, homemakers, culinary students, professional cooks, and caterers.",
+  "Soru must highlight personalized nutrition plans, student lunchboxes, family meals, subscriptions, flexible ordering, chef onboarding, and FSSAI/food-license guidance when relevant.",
+  "Soru must never invent available chefs, prices, delivery guarantees, medical outcomes, or fake menu items.",
+  "If real chef menu records are present, use them as grounding context. If none exist, produce a chef-ready recommendation brief only.",
+];
+
+function compactRow(row: Record<string, unknown>, keys: string[]) {
+  return Object.fromEntries(
+    keys
+      .map((key) => [key, row[key]])
+      .filter(([, value]) => {
+        if (Array.isArray(value)) return value.length > 0;
+        return value !== null && value !== undefined && String(value).trim() !== "";
+      }),
+  );
+}
+
+async function safeSelect<T>(
+  query: PromiseLike<{ data: T[] | T | null; error: { message: string } | null }>,
+) {
+  const { data, error } = await query;
+  if (error) {
+    console.error("Training-context read skipped", error.message);
+    return null;
+  }
+  return data;
+}
+
+async function loadSoruTrainingContext(input: {
+  supabase: ReturnType<typeof createClient>;
+  userId: string;
+}) {
+  const [profile, mealPlans, lunchboxes, menuItems] = await Promise.all([
+    safeSelect<Record<string, unknown>>(
+      input.supabase
+        .from("profiles")
+        .select("full_name,city,default_role")
+        .eq("user_id", input.userId)
+        .maybeSingle(),
+    ),
+    safeSelect<Record<string, unknown>[]>(
+      input.supabase
+        .from("meal_plan_requests")
+        .select("goal,nutrition_focus,diet_type,allergies,meals_per_day,budget_range,city,notes,created_at")
+        .eq("user_id", input.userId)
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ),
+    safeSelect<Record<string, unknown>[]>(
+      input.supabase
+        .from("lunchbox_requests")
+        .select("child_age,preferences,dislikes,allergies,health_goals,school_timing,budget_range,city,created_at")
+        .eq("user_id", input.userId)
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ),
+    safeSelect<Record<string, unknown>[]>(
+      input.supabase
+        .from("chef_menu_items")
+        .select("name,description,category,price_inr,meal_type,dietary_tags,allergens,available_days")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(12),
+    ),
+  ]);
+
+  return {
+    profile: profile ? compactRow(profile, ["city", "default_role"]) : null,
+    recent_meal_plan_requests: (Array.isArray(mealPlans) ? mealPlans : []).map((row) =>
+      compactRow(row, [
+        "goal",
+        "nutrition_focus",
+        "diet_type",
+        "allergies",
+        "meals_per_day",
+        "budget_range",
+        "city",
+        "notes",
+      ]),
+    ),
+    recent_lunchbox_requests: (Array.isArray(lunchboxes) ? lunchboxes : []).map((row) =>
+      compactRow(row, [
+        "child_age",
+        "preferences",
+        "dislikes",
+        "allergies",
+        "health_goals",
+        "school_timing",
+        "budget_range",
+        "city",
+      ]),
+    ),
+    available_menu_items: (Array.isArray(menuItems) ? menuItems : []).map((row) =>
+      compactRow(row, [
+        "name",
+        "description",
+        "category",
+        "price_inr",
+        "meal_type",
+        "dietary_tags",
+        "allergens",
+        "available_days",
+      ]),
+    ),
+  } satisfies SoruTrainingContext;
+}
+
+function buildLangChainRecommendationSchema(z: {
+  object: (shape: Record<string, unknown>) => unknown;
+  string: () => {
+    describe: (text: string) => unknown;
+  };
+  array: (schema: unknown) => {
+    min: (count: number) => { max: (count: number) => { describe: (text: string) => unknown } };
+  };
+}) {
+  const shortText = z.string();
+  return z.object({
+    title: shortText.describe("A short premium title for the recommendation."),
+    summary: shortText.describe("A concise customer-facing summary."),
+    safety_note: shortText.describe("A non-medical safety note, including allergy caution."),
+    daily_targets: z
+      .array(shortText)
+      .min(3)
+      .max(6)
+      .describe("Practical daily food targets, without invented medical claims."),
+    meal_recommendations: z
+      .array(
+        z.object({
+          meal: shortText.describe("Meal slot, such as breakfast, lunch, dinner, snack, or lunchbox."),
+          recommendation: shortText.describe("Chef-ready meal recommendation."),
+          why_it_fits: shortText.describe("Why this fits the customer's goals and constraints."),
+          chef_note: shortText.describe("Instruction a Soru chef or home cook can follow."),
+        }),
+      )
+      .min(3)
+      .max(6)
+      .describe("Three to six practical meal recommendations."),
+    chef_instructions: z
+      .array(shortText)
+      .min(3)
+      .max(6)
+      .describe("Instructions for chefs preparing this plan."),
+    avoid_or_watch: z
+      .array(shortText)
+      .min(2)
+      .max(6)
+      .describe("Allergies, ingredients, or preparation choices to avoid or watch."),
+    next_steps: z
+      .array(shortText)
+      .min(2)
+      .max(5)
+      .describe("Next actions for the customer or Soru team."),
+  });
+}
+
+function langChainPromptFor(input: {
+  kind: RecommendationKind;
+  payload: Record<string, unknown>;
+  trainingContext: SoruTrainingContext;
+}) {
+  return [
+    input.kind === "meal_plan"
+      ? "Generate a personalized Soru meal-plan recommendation."
+      : "Generate a Soru kids lunchbox recommendation.",
+    "",
+    "Use this as Soru's training/grounding context:",
+    JSON.stringify(
+      {
+        soru_principles: soruTrainingPrinciples,
+        user_request: input.payload,
+        user_history: {
+          profile: input.trainingContext.profile,
+          recent_meal_plan_requests: input.trainingContext.recent_meal_plan_requests,
+          recent_lunchbox_requests: input.trainingContext.recent_lunchbox_requests,
+        },
+        live_menu_context: input.trainingContext.available_menu_items,
+      },
+      null,
+      2,
+    ),
+    "",
+    "Recommendation rules:",
+    "- Use the user's current request as the highest-priority signal.",
+    "- Use user history only to personalize; do not expose private history directly.",
+    "- Use live_menu_context only if it contains real records. If it is empty, do not invent menu items or chef availability.",
+    "- Respect allergies strictly.",
+    "- Keep language concise, premium, warm, and practical for Indian chef-made meals.",
+    "- Mention when a chef, nutrition expert, or doctor should review the request for allergies, pregnancy, medical conditions, or clinical nutrition needs.",
+    "- Return only structured data matching the schema.",
+  ].join("\n");
+}
+
 function extractOutputText(result: Record<string, unknown>) {
   if (typeof result.output_text === "string") return result.output_text;
   const output = Array.isArray(result.output) ? result.output : [];
@@ -256,6 +459,73 @@ async function generateWithGemini(input: {
   };
 }
 
+async function generateWithLangChainGemini(input: {
+  kind: RecommendationKind;
+  payload: Record<string, unknown>;
+  apiKey: string;
+  model: string;
+  trainingContext: SoruTrainingContext;
+}) {
+  let ChatGoogle: new (options: Record<string, unknown>) => {
+    withStructuredOutput: (schema: unknown) => {
+      invoke: (messages: Array<[string, string]>) => Promise<Record<string, unknown>>;
+    };
+  };
+  let z: Parameters<typeof buildLangChainRecommendationSchema>[0];
+
+  try {
+    ({ ChatGoogle } = await import("npm:@langchain/google@0.2.1"));
+    ({ z } = await import("npm:zod@3.25.76"));
+  } catch (error) {
+    console.error("LangChain import failed", error);
+    throw new Error("langchain_unavailable");
+  }
+
+  try {
+    const llm = new ChatGoogle({
+      apiKey: input.apiKey,
+      model: input.model,
+      temperature: 0.35,
+      maxRetries: 1,
+    });
+    const structuredModel = llm.withStructuredOutput(buildLangChainRecommendationSchema(z));
+
+    const recommendation = await structuredModel.invoke([
+      [
+        "system",
+        "You are Soru's nutrition-aware AI meal planning engine. You create safe, practical, chef-ready food recommendations for India. You are not a doctor and must not provide medical diagnosis or treatment.",
+      ],
+      [
+        "human",
+        langChainPromptFor({
+          kind: input.kind,
+          payload: input.payload,
+          trainingContext: input.trainingContext,
+        }),
+      ],
+    ]);
+
+    return {
+      recommendation,
+      model: input.model,
+      provider: "langchain-gemini",
+      generated_at: new Date().toISOString(),
+      training_context: {
+        recent_meal_plan_requests: input.trainingContext.recent_meal_plan_requests.length,
+        recent_lunchbox_requests: input.trainingContext.recent_lunchbox_requests.length,
+        live_menu_items: input.trainingContext.available_menu_items.length,
+      },
+    };
+  } catch (error) {
+    console.error("LangChain Gemini request failed", {
+      model: input.model,
+      kind: input.kind,
+      error,
+    });
+    throw new Error("langchain_gemini_unavailable");
+  }
+}
+
 async function generateWithOpenAI(input: {
   kind: RecommendationKind;
   payload: Record<string, unknown>;
@@ -348,6 +618,36 @@ async function generateWithGeminiFallback(input: {
   throw lastError instanceof Error ? lastError : new Error("gemini_unavailable");
 }
 
+async function generateWithLangChainGeminiFallback(input: {
+  kind: RecommendationKind;
+  payload: Record<string, unknown>;
+  apiKey: string;
+  trainingContext: SoruTrainingContext;
+}) {
+  const configuredModel = env("LANGCHAIN_GEMINI_MODEL") || env("GEMINI_MODEL");
+  const models = configuredModel
+    ? [configuredModel]
+    : ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
+
+  let lastError: unknown;
+  for (const model of models) {
+    try {
+      return await generateWithLangChainGemini({
+        kind: input.kind,
+        payload: input.payload,
+        apiKey: input.apiKey,
+        model,
+        trainingContext: input.trainingContext,
+      });
+    } catch (error) {
+      lastError = error;
+      console.error("LangChain model attempt failed", { model, kind: input.kind, error });
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("langchain_gemini_unavailable");
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") {
@@ -413,12 +713,42 @@ Deno.serve(async (request) => {
 
   try {
     if (geminiApiKey) {
-      return Response.json(
-        await generateWithGeminiFallback({
+      const trainingContext = await loadSoruTrainingContext({
+        supabase,
+        userId: userData.user.id,
+      });
+
+      try {
+        return Response.json(
+          await generateWithLangChainGeminiFallback({
+            kind: body.kind,
+            payload,
+            apiKey: geminiApiKey,
+            trainingContext,
+          }),
+          { headers: corsHeaders },
+        );
+      } catch (langChainError) {
+        console.error("LangChain unavailable, falling back to direct Gemini", {
           kind: body.kind,
-          payload,
-          apiKey: geminiApiKey,
-        }),
+          error: langChainError,
+        });
+      }
+
+      return Response.json(
+        {
+          ...(await generateWithGeminiFallback({
+            kind: body.kind,
+            payload,
+            apiKey: geminiApiKey,
+          })),
+          training_context: {
+            fallback: "direct-gemini",
+            recent_meal_plan_requests: trainingContext.recent_meal_plan_requests.length,
+            recent_lunchbox_requests: trainingContext.recent_lunchbox_requests.length,
+            live_menu_items: trainingContext.available_menu_items.length,
+          },
+        },
         { headers: corsHeaders },
       );
     }
@@ -448,3 +778,12 @@ Deno.serve(async (request) => {
     { status: 503, headers: corsHeaders },
   );
 });
+
+/* c8 ignore start */
+export const __soruAiRecommendationInternals = {
+  normalizePayload,
+  promptFor,
+  langChainPromptFor,
+  soruTrainingPrinciples,
+};
+/* c8 ignore stop */
