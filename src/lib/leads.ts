@@ -16,6 +16,15 @@ export type PublicLeadInput = {
   notes?: string | null;
   preferred_service?: string | null;
   chef_role?: string | null;
+  kitchen_name?: string | null;
+  area?: string | null;
+  specialties?: string | null;
+  cuisines?: string | null;
+  signature_dish?: string | null;
+  sample_menu?: string | null;
+  expected_price_range?: string | null;
+  fssai_status?: string | null;
+  public_listing_consent?: boolean;
   consent: boolean;
   website?: string;
 };

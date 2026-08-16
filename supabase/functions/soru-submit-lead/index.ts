@@ -18,6 +18,18 @@ const schema = z.object({
   notes: z.string().trim().max(1500).optional().nullable(),
   preferred_service: z.string().trim().max(120).optional().nullable(),
   chef_role: z.string().trim().max(120).optional().nullable(),
+  kitchen_name: z.string().trim().max(120).optional().nullable(),
+  area: z.string().trim().max(120).optional().nullable(),
+  specialties: z.string().trim().max(500).optional().nullable(),
+  cuisines: z.string().trim().max(500).optional().nullable(),
+  signature_dish: z.string().trim().max(160).optional().nullable(),
+  sample_menu: z.string().trim().max(600).optional().nullable(),
+  expected_price_range: z.string().trim().max(120).optional().nullable(),
+  fssai_status: z
+    .enum(["not_started", "need_guidance", "in_progress", "submitted", "approved"])
+    .optional()
+    .nullable(),
+  public_listing_consent: z.boolean().optional().nullable(),
   consent: z.literal(true),
   consent_version: z.string().trim().min(2).max(80),
   utm_source: z.string().trim().max(120).optional().nullable(),
@@ -37,6 +49,14 @@ function normalizePhone(value: string) {
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
+}
+
+function splitList(value: string | null | undefined) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 12);
 }
 
 function isRealisticPhone(value: string) {
@@ -192,6 +212,15 @@ Deno.serve(async (request) => {
     notes: payload.notes || null,
     preferred_service: payload.preferred_service || null,
     chef_role: payload.chef_role || null,
+    kitchen_name: payload.kitchen_name || null,
+    area: payload.area || payload.locality || null,
+    specialties: payload.specialties || null,
+    cuisines: payload.cuisines || null,
+    signature_dish: payload.signature_dish || null,
+    sample_menu: payload.sample_menu || null,
+    expected_price_range: payload.expected_price_range || null,
+    fssai_status: payload.fssai_status || null,
+    public_listing_consent: Boolean(payload.public_listing_consent),
     utm_source: payload.utm_source || null,
     utm_medium: payload.utm_medium || null,
     utm_campaign: payload.utm_campaign || null,
@@ -220,6 +249,37 @@ Deno.serve(async (request) => {
   const normalizedPhone = normalizePhone(payload.phone);
   const normalizedEmail = normalizeEmail(payload.email);
 
+  async function upsertChefInterestListing(leadId: string) {
+    if (payload.role !== "chef" || !payload.public_listing_consent) return;
+    const displayCity = payload.city?.trim();
+    if (!displayCity) return;
+
+    const listing = {
+      lead_id: leadId,
+      full_name: payload.full_name,
+      kitchen_name: payload.kitchen_name || null,
+      chef_role: payload.chef_role || "home_cook",
+      city: displayCity,
+      area: payload.area || payload.locality || null,
+      bio: payload.notes || null,
+      specialties: splitList(payload.specialties || payload.signature_dish || payload.notes),
+      cuisines: splitList(payload.cuisines),
+      signature_dish: payload.signature_dish || null,
+      sample_menu: payload.sample_menu || null,
+      expected_price_range: payload.expected_price_range || null,
+      fssai_status: payload.fssai_status || "not_started",
+      public_visible: true,
+      status: "submitted",
+    };
+
+    const saved = await supabase
+      .from("chef_interest_listings")
+      .upsert(listing, { onConflict: "lead_id" });
+    if (saved.error) {
+      console.error("Chef interest listing upsert failed", saved.error);
+    }
+  }
+
   const { data: existingByPhone } = await supabase
     .from("leads")
     .select("id")
@@ -228,6 +288,7 @@ Deno.serve(async (request) => {
     .maybeSingle();
 
   if (existingByPhone?.id) {
+    await upsertChefInterestListing(existingByPhone.id);
     return Response.json(
       { ok: true, duplicate: true, lead_id: existingByPhone.id },
       { headers: corsHeaders },
@@ -242,6 +303,7 @@ Deno.serve(async (request) => {
     .maybeSingle();
 
   if (existingByEmail?.id) {
+    await upsertChefInterestListing(existingByEmail.id);
     return Response.json(
       { ok: true, duplicate: true, lead_id: existingByEmail.id },
       { headers: corsHeaders },
@@ -258,6 +320,8 @@ Deno.serve(async (request) => {
   }
 
   if (inserted.data?.id) {
+    await upsertChefInterestListing(inserted.data.id);
+
     const notification = await supabase.from("notification_events").insert({
       dedupe_key: `lead:${inserted.data.id}`,
       event_type: eventTypeForLead(payload.source, payload.role),

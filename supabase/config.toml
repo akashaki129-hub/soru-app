@@ -3,5 +3,8 @@ project_id = "gvadkkeqlwesncsrvzmr"
 [functions.soru-notifications]
 verify_jwt = false
 
+[functions.soru-register-chef]
+verify_jwt = false
+
 [functions.soru-ai-recommendations]
 verify_jwt = true

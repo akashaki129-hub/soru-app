@@ -48,6 +48,26 @@ export type ChefProfile = {
   is_listed: boolean;
 };
 
+export type ChefInterestListing = {
+  id: string;
+  lead_id: string | null;
+  full_name: string;
+  kitchen_name: string | null;
+  chef_role: string;
+  city: string;
+  area: string | null;
+  bio: string | null;
+  specialties: string[];
+  cuisines: string[];
+  signature_dish: string | null;
+  sample_menu: string | null;
+  expected_price_range: string | null;
+  fssai_status: string;
+  public_visible: boolean;
+  status: string;
+  created_at: string;
+};
+
 export type MenuItem = {
   id: string;
   chef_profile_id: string;

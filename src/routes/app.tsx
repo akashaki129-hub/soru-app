@@ -29,6 +29,7 @@ import {
   joinList,
   lunchboxGoalOptions,
   nutritionFocusOptions,
+  type ChefInterestListing,
   type ChefProfile,
   type CustomerOrder,
   type LunchboxRequest,
@@ -55,6 +56,7 @@ function CustomerAppPage() {
   const [userId, setUserId] = useState("");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [chefs, setChefs] = useState<ChefProfile[]>([]);
+  const [chefRegistrations, setChefRegistrations] = useState<ChefInterestListing[]>([]);
   const [menus, setMenus] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -75,6 +77,7 @@ function CustomerAppPage() {
     const [
       profileRes,
       chefsRes,
+      chefRegistrationsRes,
       menusRes,
       ordersRes,
       subscriptionsRes,
@@ -83,6 +86,11 @@ function CustomerAppPage() {
     ] = await Promise.all([
       db.from<Profile>("profiles").select("*").eq("user_id", user.id).maybeSingle(),
       db.from<ChefProfile>("chef_profiles").select("*").order("created_at", { ascending: false }),
+      db
+        .from<ChefInterestListing>("chef_interest_listings")
+        .select("*")
+        .eq("public_visible", true)
+        .order("created_at", { ascending: false }),
       db
         .from<MenuItem>("chef_menu_items")
         .select("*")
@@ -111,7 +119,8 @@ function CustomerAppPage() {
     ]);
 
     if (profileRes.error) toast.error("Could not load your profile.");
-    if (chefsRes.error || menusRes.error) toast.error("Could not load chefs yet.");
+    if (chefsRes.error || chefRegistrationsRes.error || menusRes.error)
+      toast.error("Could not load chefs yet.");
 
     const repairedProfile =
       !profileRes.error && !profileRes.data ? await ensureProfileForUser(user, "customer") : null;
@@ -119,6 +128,7 @@ function CustomerAppPage() {
 
     setProfile(activeProfile);
     setChefs(chefsRes.data || []);
+    setChefRegistrations(chefRegistrationsRes.data || []);
     setMenus(menusRes.data || []);
     setOrders(ordersRes.data || []);
     setSubscriptions(subscriptionsRes.data || []);
@@ -145,6 +155,18 @@ function CustomerAppPage() {
       return aMatch - bMatch || a.display_name.localeCompare(b.display_name);
     });
   }, [chefs, cityFilter]);
+
+  const sortedChefRegistrations = useMemo(() => {
+    const needle = cityFilter.trim().toLowerCase();
+    return [...chefRegistrations].sort((a, b) => {
+      const aMatch = needle && a.city.toLowerCase().includes(needle) ? 0 : 1;
+      const bMatch = needle && b.city.toLowerCase().includes(needle) ? 0 : 1;
+      return (
+        aMatch - bMatch ||
+        (a.kitchen_name || a.full_name).localeCompare(b.kitchen_name || b.full_name)
+      );
+    });
+  }, [chefRegistrations, cityFilter]);
 
   async function createOrder(menu: MenuItem, chef: ChefProfile) {
     if (!profile?.city) {
@@ -244,6 +266,7 @@ function CustomerAppPage() {
             {tab === "explore" && (
               <ExploreSection
                 chefs={sortedChefs}
+                chefRegistrations={sortedChefRegistrations}
                 menus={menus}
                 cityFilter={cityFilter}
                 setCityFilter={setCityFilter}
@@ -446,6 +469,7 @@ function ProfileCompletionCard({
 
 function ExploreSection({
   chefs,
+  chefRegistrations,
   menus,
   cityFilter,
   setCityFilter,
@@ -453,6 +477,7 @@ function ExploreSection({
   saving,
 }: {
   chefs: ChefProfile[];
+  chefRegistrations: ChefInterestListing[];
   menus: MenuItem[];
   cityFilter: string;
   setCityFilter: (value: string) => void;
@@ -479,27 +504,26 @@ function ExploreSection({
       </aside>
 
       <div className="space-y-5">
-        {chefs.length === 0 ? (
+        {chefs.length === 0 && chefRegistrations.length === 0 ? (
           <EmptyCard
             title="No chefs listed yet"
-            text="Once verified chefs or home cooks publish their profile, they will appear here."
+            text="Once chefs or home cooks register, they will appear here."
           />
         ) : (
-          chefs.map((chef) => {
-            const chefMenus = menus.filter((menu) => menu.chef_profile_id === chef.id);
-            return (
+          <>
+            {chefRegistrations.map((chef) => (
               <article
                 key={chef.id}
-                className="rounded-3xl border border-border bg-card p-5 shadow-soft md:p-6"
+                className="rounded-3xl border border-primary/25 bg-card p-5 shadow-soft md:p-6"
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-2xl font-semibold">
-                        {chef.kitchen_name || chef.display_name}
+                        {chef.kitchen_name || chef.full_name}
                       </h3>
-                      <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-bold">
-                        {chef.verification_status === "verified" ? "Verified" : "Profile submitted"}
+                      <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-foreground">
+                        New chef registration
                       </span>
                     </div>
                     <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -507,58 +531,117 @@ function ExploreSection({
                       {[chef.area, chef.city].filter(Boolean).join(", ")}
                     </p>
                     <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                      {chef.bio || "This chef has not added a bio yet."}
+                      {chef.bio ||
+                        `${chef.full_name} has registered interest to cook with Soru.`}
                     </p>
-                    <p className="mt-3 text-sm">
-                      <span className="font-bold">Speciality:</span> {joinList(chef.specialties)}
-                    </p>
-                    <p className="mt-1 text-sm">
-                      <span className="font-bold">Cuisines:</span> {joinList(chef.cuisines)}
-                    </p>
+                    <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
+                      <p>
+                        <span className="font-bold">Speciality:</span>{" "}
+                        {joinList(chef.specialties)}
+                      </p>
+                      <p>
+                        <span className="font-bold">Cuisines:</span> {joinList(chef.cuisines)}
+                      </p>
+                      <p>
+                        <span className="font-bold">Signature dish:</span>{" "}
+                        {chef.signature_dish || "To be shared"}
+                      </p>
+                      <p>
+                        <span className="font-bold">Price range:</span>{" "}
+                        {chef.expected_price_range || "To be shared"}
+                      </p>
+                    </div>
                   </div>
                   <ChefHat className="size-10 text-primary" />
                 </div>
-
-                <div className="mt-5 grid gap-3 md:grid-cols-2">
-                  {chefMenus.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                      Menu not published yet.
-                    </div>
-                  ) : (
-                    chefMenus.map((menu) => (
-                      <div
-                        key={menu.id}
-                        className="rounded-2xl border border-border bg-background p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h4 className="font-bold">{menu.name}</h4>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {menu.description || "Chef-made meal"}
-                            </p>
-                          </div>
-                          <span className="whitespace-nowrap text-sm font-extrabold">
-                            {currency(menu.price_inr)}
-                          </span>
-                        </div>
-                        <p className="mt-3 text-xs text-muted-foreground">
-                          {joinList(menu.dietary_tags)} · Allergens: {joinList(menu.allergens)}
-                        </p>
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => createOrder(menu, chef)}
-                          className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-60"
-                        >
-                          Request order <ArrowRight className="size-3.5" />
-                        </button>
-                      </div>
-                    ))
-                  )}
+                <div className="mt-5 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 text-sm text-muted-foreground">
+                  <span className="font-bold text-foreground">Sample menu:</span>{" "}
+                  {chef.sample_menu || "Menu to be published after onboarding."}
                 </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Registration received. Soru will review food safety, menu details, and FSSAI
+                  readiness before marking this chef verified.
+                </p>
               </article>
-            );
-          })
+            ))}
+
+            {chefs.map((chef) => {
+              const chefMenus = menus.filter((menu) => menu.chef_profile_id === chef.id);
+              return (
+                <article
+                  key={chef.id}
+                  className="rounded-3xl border border-border bg-card p-5 shadow-soft md:p-6"
+                >
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-2xl font-semibold">
+                          {chef.kitchen_name || chef.display_name}
+                        </h3>
+                        <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-bold">
+                          {chef.verification_status === "verified"
+                            ? "Verified"
+                            : "Profile submitted"}
+                        </span>
+                      </div>
+                      <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="size-4" />{" "}
+                        {[chef.area, chef.city].filter(Boolean).join(", ")}
+                      </p>
+                      <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+                        {chef.bio || "This chef has not added a bio yet."}
+                      </p>
+                      <p className="mt-3 text-sm">
+                        <span className="font-bold">Speciality:</span> {joinList(chef.specialties)}
+                      </p>
+                      <p className="mt-1 text-sm">
+                        <span className="font-bold">Cuisines:</span> {joinList(chef.cuisines)}
+                      </p>
+                    </div>
+                    <ChefHat className="size-10 text-primary" />
+                  </div>
+
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    {chefMenus.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                        Menu not published yet.
+                      </div>
+                    ) : (
+                      chefMenus.map((menu) => (
+                        <div
+                          key={menu.id}
+                          className="rounded-2xl border border-border bg-background p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h4 className="font-bold">{menu.name}</h4>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {menu.description || "Chef-made meal"}
+                              </p>
+                            </div>
+                            <span className="whitespace-nowrap text-sm font-extrabold">
+                              {currency(menu.price_inr)}
+                            </span>
+                          </div>
+                          <p className="mt-3 text-xs text-muted-foreground">
+                            {joinList(menu.dietary_tags)} · Allergens: {joinList(menu.allergens)}
+                          </p>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => createOrder(menu, chef)}
+                            className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-60"
+                          >
+                            Request order <ArrowRight className="size-3.5" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </>
         )}
       </div>
       <style>{inputStyles}</style>

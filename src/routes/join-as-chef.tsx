@@ -3,8 +3,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { BrandLogo } from "@/components/brand-logo";
-import { submitPublicLead } from "@/lib/leads";
-import { isValidPhoneNumber } from "@/lib/validation";
+import { supabase } from "@/integrations/supabase/client";
+import { PILOT_CONSENT_VERSION } from "@/lib/attribution";
+import { isValidPhoneNumber, normalizePhone } from "@/lib/validation";
 
 export const Route = createFileRoute("/join-as-chef")({
   head: () => ({
@@ -34,8 +35,22 @@ const schema = z.object({
     .trim()
     .refine(isValidPhoneNumber, "Please enter a real mobile number, not a placeholder."),
   email: z.string().trim().email("Valid email required").max(255),
+  kitchen_name: z.string().trim().max(120).optional(),
+  city: z.string().trim().min(2, "City is required").max(120),
+  area: z.string().trim().max(120).optional(),
   role: z.enum(["chef", "homemaker", "culinary_student", "professional_chef", "freelancer"]),
+  specialties: z.string().trim().min(2, "Speciality is required").max(500),
+  cuisines: z.string().trim().min(2, "Cuisine is required").max(500),
+  signature_dish: z.string().trim().min(2, "Signature dish is required").max(160),
+  sample_menu: z.string().trim().max(600).optional(),
+  expected_price_range: z.string().trim().min(2, "Expected price range is required").max(120),
+  fssai_status: z.enum(["not_started", "need_guidance", "in_progress", "submitted", "approved"]),
   comments: z.string().trim().max(1500, "Please keep your note under 1,500 characters").optional(),
+  public_listing_consent: z.literal(true, {
+    errorMap: () => ({
+      message: "Please agree to show your chef profile in the Soru app list.",
+    }),
+  }),
   consent: z.literal(true, {
     errorMap: () => ({ message: "Please agree to Soru’s Privacy Policy before submitting." }),
   }),
@@ -46,8 +61,18 @@ function ChefEnrollPage() {
     name: "",
     phone: "",
     email: "",
+    kitchen_name: "",
+    city: "",
+    area: "",
     role: "" as "" | (typeof roleOptions)[number]["value"],
+    specialties: "",
+    cuisines: "",
+    signature_dish: "",
+    sample_menu: "",
+    expected_price_range: "",
+    fssai_status: "need_guidance" as const,
     comments: "",
+    public_listing_consent: false,
     consent: false,
   });
   const [loading, setLoading] = useState(false);
@@ -63,16 +88,33 @@ function ChefEnrollPage() {
     setLoading(true);
     let saveError = "";
     try {
-      await submitPublicLead({
-        full_name: parsed.data.name,
-        phone: parsed.data.phone,
-        email: parsed.data.email,
-        role: "chef",
-        source: "chef_enrollment",
-        chef_role: parsed.data.role,
-        notes: parsed.data.comments || null,
-        consent: parsed.data.consent,
+      const { data, error } = await supabase.functions.invoke<{
+        ok: boolean;
+        listing_id?: string;
+        message?: string;
+      }>("soru-register-chef", {
+        body: {
+          full_name: parsed.data.name,
+          phone: normalizePhone(parsed.data.phone),
+          email: parsed.data.email,
+          city: parsed.data.city,
+          area: parsed.data.area || null,
+          chef_role: parsed.data.role,
+          kitchen_name: parsed.data.kitchen_name || null,
+          specialties: parsed.data.specialties,
+          cuisines: parsed.data.cuisines,
+          signature_dish: parsed.data.signature_dish,
+          sample_menu: parsed.data.sample_menu || null,
+          expected_price_range: parsed.data.expected_price_range,
+          fssai_status: parsed.data.fssai_status,
+          public_listing_consent: parsed.data.public_listing_consent,
+          notes: parsed.data.comments || null,
+          consent: parsed.data.consent,
+          consent_version: PILOT_CONSENT_VERSION,
+        },
       });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.message || "Could not submit.");
     } catch (error) {
       saveError = error instanceof Error ? error.message : "Could not submit.";
     }
@@ -82,8 +124,25 @@ function ChefEnrollPage() {
       return;
     }
     setDone(true);
-    toast.success("Welcome aboard! We'll reach out shortly.");
-    setForm({ name: "", phone: "", email: "", role: "", comments: "", consent: false });
+    toast.success("Chef registration received and added to the Soru app list.");
+    setForm({
+      name: "",
+      phone: "",
+      email: "",
+      kitchen_name: "",
+      city: "",
+      area: "",
+      role: "",
+      specialties: "",
+      cuisines: "",
+      signature_dish: "",
+      sample_menu: "",
+      expected_price_range: "",
+      fssai_status: "need_guidance",
+      comments: "",
+      public_listing_consent: false,
+      consent: false,
+    });
   }
 
   return (
@@ -102,10 +161,11 @@ function ChefEnrollPage() {
       <main className="container-x py-16 md:py-24">
         <div className="mx-auto max-w-xl">
           <h1 className="text-balance text-3xl font-semibold tracking-tight md:text-4xl">
-            Become a Soru chef
+            Register your chef profile
           </h1>
           <p className="mt-3 text-muted-foreground">
-            Whether you're a home cook, student, or seasoned pro — we'd love to have you.
+            Fill this one-page form to join Soru’s chef pipeline and appear in the customer app as a
+            new chef registration while we review verification.
           </p>
 
           {done ? (
@@ -113,7 +173,8 @@ function ChefEnrollPage() {
               <div className="text-4xl">👩‍🍳</div>
               <h2 className="mt-3 text-xl font-semibold">Application received</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Our team will get back to you within a few days.
+                Your public chef profile has been added to the Soru app list as a new registration.
+                Our team will follow up for verification and onboarding.
               </p>
               <button
                 onClick={() => setDone(false)}
@@ -156,6 +217,33 @@ function ChefEnrollPage() {
                   placeholder="you@email.com"
                 />
               </Field>
+              <div className="grid gap-5 md:grid-cols-2">
+                <Field label="Kitchen / brand name">
+                  <input
+                    value={form.kitchen_name}
+                    onChange={(e) => setForm({ ...form, kitchen_name: e.target.value })}
+                    className="input"
+                    placeholder="Asha's Kitchen"
+                  />
+                </Field>
+                <Field label="City">
+                  <input
+                    required
+                    value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    className="input"
+                    placeholder="Bengaluru"
+                  />
+                </Field>
+              </div>
+              <Field label="Area / locality">
+                <input
+                  value={form.area}
+                  onChange={(e) => setForm({ ...form, area: e.target.value })}
+                  className="input"
+                  placeholder="Indiranagar, Anna Nagar, HSR Layout…"
+                />
+              </Field>
               <Field label="I am a…">
                 <select
                   required
@@ -171,6 +259,69 @@ function ChefEnrollPage() {
                   ))}
                 </select>
               </Field>
+              <Field label="Specialities">
+                <input
+                  required
+                  value={form.specialties}
+                  onChange={(e) => setForm({ ...form, specialties: e.target.value })}
+                  className="input"
+                  placeholder="Kerala meals, healthy bowls, biryani, millet food"
+                />
+              </Field>
+              <Field label="Cuisines">
+                <input
+                  required
+                  value={form.cuisines}
+                  onChange={(e) => setForm({ ...form, cuisines: e.target.value })}
+                  className="input"
+                  placeholder="South Indian, North Indian, vegan, Jain"
+                />
+              </Field>
+              <div className="grid gap-5 md:grid-cols-2">
+                <Field label="Signature dish">
+                  <input
+                    required
+                    value={form.signature_dish}
+                    onChange={(e) => setForm({ ...form, signature_dish: e.target.value })}
+                    className="input"
+                    placeholder="Homestyle sambar rice"
+                  />
+                </Field>
+                <Field label="Expected price range">
+                  <input
+                    required
+                    value={form.expected_price_range}
+                    onChange={(e) => setForm({ ...form, expected_price_range: e.target.value })}
+                    className="input"
+                    placeholder="₹99–₹180 per meal"
+                  />
+                </Field>
+              </div>
+              <Field label="Sample menu / meal plan">
+                <textarea
+                  value={form.sample_menu}
+                  onChange={(e) => setForm({ ...form, sample_menu: e.target.value })}
+                  className="input min-h-24 resize-y"
+                  maxLength={600}
+                  placeholder="Example: Monday lunch — dal, rice, sabzi, curd. Monthly veg lunch plan available."
+                />
+              </Field>
+              <Field label="FSSAI / food license status">
+                <select
+                  required
+                  value={form.fssai_status}
+                  onChange={(e) =>
+                    setForm({ ...form, fssai_status: e.target.value as typeof form.fssai_status })
+                  }
+                  className="input"
+                >
+                  <option value="need_guidance">Need Soru guidance</option>
+                  <option value="not_started">Not started</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="approved">Approved</option>
+                </select>
+              </Field>
               <Field label="What would you like to share with Soru? (optional)">
                 <textarea
                   value={form.comments}
@@ -181,6 +332,11 @@ function ChefEnrollPage() {
                 />
               </Field>
               <ConsentBox
+                checked={form.public_listing_consent}
+                onChange={(checked) => setForm({ ...form, public_listing_consent: checked })}
+                label="I agree that Soru can show my chef/kitchen name, city, area, speciality, cuisine, signature dish, sample menu, and price range in the customer app list as a new chef registration. My phone and email will stay private."
+              />
+              <ConsentBox
                 checked={form.consent}
                 onChange={(checked) => setForm({ ...form, consent: checked })}
               />
@@ -189,7 +345,7 @@ function ChefEnrollPage() {
                 disabled={loading}
                 className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-105 disabled:opacity-60"
               >
-                {loading ? "Submitting…" : "Apply to join"}
+                {loading ? "Submitting…" : "Register and appear in app"}
               </button>
             </form>
           )}
@@ -217,9 +373,11 @@ function ChefEnrollPage() {
 function ConsentBox({
   checked,
   onChange,
+  label,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
+  label?: string;
 }) {
   return (
     <label className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4 text-sm leading-6 text-muted-foreground">
@@ -230,13 +388,17 @@ function ConsentBox({
         onChange={(event) => onChange(event.target.checked)}
         className="mt-1 size-4"
       />
-      <span>
-        I agree to Soru’s{" "}
-        <Link to="/privacy" className="font-semibold text-foreground underline">
-          Privacy Policy
-        </Link>{" "}
-        and consent to being contacted regarding the pilot.
-      </span>
+      {label ? (
+        <span>{label}</span>
+      ) : (
+        <span>
+          I agree to Soru’s{" "}
+          <Link to="/privacy" className="font-semibold text-foreground underline">
+            Privacy Policy
+          </Link>{" "}
+          and consent to being contacted regarding the pilot.
+        </span>
+      )}
     </label>
   );
 }
