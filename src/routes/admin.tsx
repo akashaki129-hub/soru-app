@@ -112,6 +112,34 @@ type ChefApplicationRow = {
   current_step: number;
 };
 
+type ChefInterestContactRow = {
+  full_name: string;
+  phone: string;
+  email: string;
+  consent_channel: string;
+  created_at: string;
+};
+
+type ChefInterestListingRow = {
+  id: string;
+  created_at: string;
+  full_name: string;
+  kitchen_name: string | null;
+  chef_role: string | null;
+  city: string;
+  area: string | null;
+  bio: string | null;
+  specialties: string[];
+  cuisines: string[];
+  signature_dish: string | null;
+  sample_menu: string | null;
+  expected_price_range: string | null;
+  fssai_status: string;
+  status: string;
+  public_visible: boolean;
+  chef_interest_contacts?: ChefInterestContactRow[] | null;
+};
+
 type AppChefProfileRow = {
   id: string;
   created_at: string;
@@ -178,7 +206,7 @@ type OperationRow = {
   status: string;
 };
 
-type AdminTab = "chefs" | "customers" | "waitlist" | "research" | "operations";
+type AdminTab = "chefs" | "applicants" | "customers" | "waitlist" | "research" | "operations";
 type EnrollmentRow = ChefRow | CustRow | WaitlistRow;
 
 const STATEMENT_LABELS: Record<string, string> = {
@@ -238,6 +266,7 @@ function AdminPage() {
   const [notificationEvents, setNotificationEvents] = useState<NotificationEventRow[]>([]);
   const [appProfiles, setAppProfiles] = useState<AppProfileRow[]>([]);
   const [chefApplications, setChefApplications] = useState<ChefApplicationRow[]>([]);
+  const [chefInterestListings, setChefInterestListings] = useState<ChefInterestListingRow[]>([]);
   const [appChefProfiles, setAppChefProfiles] = useState<AppChefProfileRow[]>([]);
   const [menuItems, setMenuItems] = useState<AppMenuItemRow[]>([]);
   const [orders, setOrders] = useState<AppOrderRow[]>([]);
@@ -269,7 +298,7 @@ function AdminPage() {
       }
 
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const [c, cu, w, r, v, n, p, ca, cp, m, o, s, mp, lb] = await Promise.all([
+      const [c, cu, w, r, v, n, p, ca, ci, cp, m, o, s, mp, lb] = await Promise.all([
         supabase.from("chef_enrollments").select("*").order("created_at", { ascending: false }),
         supabase.from("customer_enrollments").select("*").order("created_at", { ascending: false }),
         supabase.from("waitlist_entries").select("*").order("created_at", { ascending: false }),
@@ -295,6 +324,12 @@ function AdminPage() {
           .from("chef_applications")
           .select(
             "id,created_at,submitted_at,application_status,full_name,phone,email,city,cooking_role,current_step",
+          )
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("chef_interest_listings")
+          .select(
+            "id,created_at,full_name,kitchen_name,chef_role,city,area,bio,specialties,cuisines,signature_dish,sample_menu,expected_price_range,fssai_status,status,public_visible,chef_interest_contacts(full_name,phone,email,consent_channel,created_at)",
           )
           .order("created_at", { ascending: false }),
         db
@@ -341,6 +376,8 @@ function AdminPage() {
       else setAppProfiles(p.data as AppProfileRow[]);
       if (ca.error) toast.error(ca.error.message);
       else setChefApplications(ca.data as ChefApplicationRow[]);
+      if (ci.error) toast.error(ci.error.message);
+      else setChefInterestListings(ci.data as ChefInterestListingRow[]);
       if (cp.error) toast.error(cp.error.message);
       else setAppChefProfiles(cp.data as AppChefProfileRow[]);
       if (m.error) toast.error(m.error.message);
@@ -399,6 +436,37 @@ function AdminPage() {
       return matchesAudience && matchesCity && matchesQuery;
     });
   }, [audienceFilter, cityFilter, q, research]);
+
+  const filteredChefInterestListings = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return chefInterestListings.filter((row) => {
+      const contact = getPrimaryChefInterestContact(row);
+      return (
+        !query ||
+        [
+          row.full_name,
+          row.kitchen_name,
+          row.chef_role,
+          row.city,
+          row.area,
+          row.bio,
+          row.signature_dish,
+          row.sample_menu,
+          row.expected_price_range,
+          row.fssai_status,
+          row.status,
+          contact?.phone,
+          contact?.email,
+          ...row.specialties,
+          ...row.cuisines,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(query)
+      );
+    });
+  }, [chefInterestListings, q]);
 
   const operationRows = useMemo<OperationRow[]>(() => {
     const rows: OperationRow[] = [
@@ -509,6 +577,55 @@ function AdminPage() {
   }
 
   function exportCsv() {
+    if (tab === "applicants") {
+      const headers = [
+        "created_at",
+        "full_name",
+        "kitchen_name",
+        "phone",
+        "email",
+        "city",
+        "area",
+        "chef_role",
+        "specialties",
+        "cuisines",
+        "signature_dish",
+        "expected_price_range",
+        "fssai_status",
+        "status",
+        "public_visible",
+        "sample_menu",
+        "bio",
+      ];
+      downloadCsv(
+        headers,
+        filteredChefInterestListings.map((row) => {
+          const contact = getPrimaryChefInterestContact(row);
+          return [
+            row.created_at,
+            row.full_name,
+            row.kitchen_name || "",
+            contact?.phone || "",
+            contact?.email || "",
+            row.city,
+            row.area || "",
+            row.chef_role || "",
+            row.specialties.join(" | "),
+            row.cuisines.join(" | "),
+            row.signature_dish || "",
+            row.expected_price_range || "",
+            row.fssai_status,
+            row.status,
+            row.public_visible ? "yes" : "no",
+            row.sample_menu || "",
+            row.bio || "",
+          ];
+        }),
+        "chef-applicants",
+      );
+      return;
+    }
+
     if (tab === "operations") {
       const headers: Array<keyof OperationRow> = [
         "created_at",
@@ -665,6 +782,9 @@ function AdminPage() {
           <TabBtn active={tab === "chefs"} onClick={() => changeTab("chefs")}>
             Chefs ({chefs.length})
           </TabBtn>
+          <TabBtn active={tab === "applicants"} onClick={() => changeTab("applicants")}>
+            Chef applicants ({chefInterestListings.length})
+          </TabBtn>
           <TabBtn active={tab === "customers"} onClick={() => changeTab("customers")}>
             Customers ({customers.length})
           </TabBtn>
@@ -728,10 +848,13 @@ function AdminPage() {
 
         {tab === "research" ? (
           <ResearchDashboard rows={filteredResearch} />
+        ) : tab === "applicants" ? (
+          <ChefApplicantsTable rows={filteredChefInterestListings} />
         ) : tab === "operations" ? (
           <OperationsDashboard
             profiles={appProfiles}
             chefApplications={chefApplications}
+            chefInterestListings={chefInterestListings}
             chefProfiles={appChefProfiles}
             menuItems={menuItems}
             orders={orders}
@@ -776,6 +899,7 @@ function TrafficCard({
 function OperationsDashboard({
   profiles,
   chefApplications,
+  chefInterestListings,
   chefProfiles,
   menuItems,
   orders,
@@ -786,6 +910,7 @@ function OperationsDashboard({
 }: {
   profiles: AppProfileRow[];
   chefApplications: ChefApplicationRow[];
+  chefInterestListings: ChefInterestListingRow[];
   chefProfiles: AppChefProfileRow[];
   menuItems: AppMenuItemRow[];
   orders: AppOrderRow[];
@@ -829,7 +954,7 @@ function OperationsDashboard({
           <DarkStat label="Total app accounts" value={profiles.length} />
           <DarkStat label="Customer accounts" value={customerAccounts} />
           <DarkStat label="Chef accounts" value={chefAccounts} />
-          <DarkStat label="Chef applications" value={chefApplications.length} />
+          <DarkStat label="Chef applicants" value={chefInterestListings.length} />
         </div>
       </div>
 
@@ -841,13 +966,19 @@ function OperationsDashboard({
           detail={`${chefApplications.length - submittedChefApplications} draft applications`}
         />
         <OperationMetric
+          icon={ClipboardList}
+          label="One-page chef signups"
+          value={chefInterestListings.length}
+          detail="Public applicant profiles + private contacts"
+        />
+        <OperationMetric
           icon={Users}
           label="Listed chef profiles"
           value={visibleChefs}
           detail={`${chefProfiles.length} chef profiles total`}
         />
         <OperationMetric
-          icon={ClipboardList}
+          icon={PackageCheck}
           label="Active menu items"
           value={activeMenus}
           detail={`${menuItems.length} menu items total`}
@@ -1120,11 +1251,112 @@ function ResearchDashboard({ rows }: { rows: ResearchRow[] }) {
   );
 }
 
+function ChefApplicantsTable({ rows }: { rows: ChefInterestListingRow[] }) {
+  return (
+    <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="border-b border-border px-5 py-4">
+        <h2 className="font-display text-2xl font-medium">Chef applicants</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          One-page registrations shown in the app list. Contact details are visible only here for
+          follow-up.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1100px] text-left text-sm">
+          <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Chef / kitchen</th>
+              <th className="px-4 py-3">Contact</th>
+              <th className="px-4 py-3">Location</th>
+              <th className="px-4 py-3">Speciality</th>
+              <th className="px-4 py-3">Menu / pricing</th>
+              <th className="px-4 py-3">FSSAI</th>
+              <th className="px-4 py-3">Visibility</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                  No chef applicants yet. Share the chef registration link to start filling this.
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => {
+                const contact = getPrimaryChefInterestContact(row);
+                return (
+                  <tr key={row.id} className="border-t border-border align-top">
+                    <td className="whitespace-nowrap px-4 py-4 text-xs text-muted-foreground">
+                      {new Date(row.created_at).toLocaleString()}
+                    </td>
+                    <td className="max-w-xs px-4 py-4">
+                      <div className="font-medium">{row.kitchen_name || row.full_name}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{row.full_name}</div>
+                      {row.chef_role && (
+                        <div className="mt-2">
+                          <StatusBadge>{formatLabel(row.chef_role)}</StatusBadge>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div>{contact?.phone || "—"}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {contact?.email || "—"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div>{row.city}</div>
+                      {row.area && (
+                        <div className="mt-1 text-xs text-muted-foreground">{row.area}</div>
+                      )}
+                    </td>
+                    <td className="max-w-sm px-4 py-4">
+                      <div>{row.specialties.length ? row.specialties.join(", ") : "—"}</div>
+                      {row.cuisines.length > 0 && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {row.cuisines.join(", ")}
+                        </div>
+                      )}
+                      {row.signature_dish && (
+                        <div className="mt-2 text-xs">
+                          <span className="font-semibold">Signature:</span> {row.signature_dish}
+                        </div>
+                      )}
+                    </td>
+                    <td className="max-w-sm px-4 py-4">
+                      <div>{row.expected_price_range || "—"}</div>
+                      {row.sample_menu && (
+                        <div className="mt-1 line-clamp-3 text-xs text-muted-foreground">
+                          {row.sample_menu}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <StatusBadge>{formatLabel(row.fssai_status)}</StatusBadge>
+                    </td>
+                    <td className="px-4 py-4">
+                      <StatusBadge>{row.public_visible ? "Visible in app" : "Private"}</StatusBadge>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {formatLabel(row.status)}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function EnrollmentTable({
   tab,
   rows,
 }: {
-  tab: Exclude<AdminTab, "research" | "operations">;
+  tab: Exclude<AdminTab, "applicants" | "research" | "operations">;
   rows: EnrollmentRow[];
 }) {
   return (
@@ -1328,13 +1560,17 @@ function getEnrollmentValue(row: EnrollmentRow, header: string) {
 
 function getEnrollmentCategory(
   row: EnrollmentRow,
-  tab: Exclude<AdminTab, "research" | "operations">,
+  tab: Exclude<AdminTab, "applicants" | "research" | "operations">,
 ) {
   if (tab === "chefs" && "role" in row) return formatLabel(row.role);
   if (tab === "customers" && "preferred_service" in row) return row.preferred_service;
   if (tab === "waitlist" && "city" in row && "role" in row)
     return `${row.city} · ${formatLabel(row.role)}`;
   return "—";
+}
+
+function getPrimaryChefInterestContact(row: ChefInterestListingRow) {
+  return row.chef_interest_contacts?.[0] || null;
 }
 
 function formatLabel(value: string) {
