@@ -17,7 +17,6 @@ import { toast } from "sonner";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { supabase } from "@/integrations/supabase/client";
-import { getPublicChefProspects } from "@/lib/api/chef-prospects.functions";
 import {
   buildLunchboxSummary,
   buildMealPlanSummary,
@@ -52,7 +51,12 @@ type Tab = "explore" | "subscriptions" | "meal-plans" | "lunchbox" | "orders";
 
 async function loadChefRegistrations() {
   try {
-    const data = await getPublicChefProspects({ data: {} });
+    const response = await fetch("/api/public-chef-prospects", {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Chef prospects request failed: ${response.status}`);
+    const data = (await response.json()) as ChefInterestListing[];
     return { data, error: null };
   } catch (error) {
     console.error("[Soru] Could not load merged chef prospects.", error);
@@ -131,8 +135,7 @@ function CustomerAppPage() {
 
     if (profileRes.error) toast.error("Could not load your profile.");
     if (chefsRes.error || menusRes.error) toast.error("Could not load chefs yet.");
-    if (chefRegistrationsRes.error)
-      toast.error("Could not load chefs yet.");
+    if (chefRegistrationsRes.error) toast.error("Could not load chefs yet.");
 
     const repairedProfile =
       !profileRes.error && !profileRes.data ? await ensureProfileForUser(user, "customer") : null;
@@ -543,13 +546,11 @@ function ExploreSection({
                       {[chef.area, chef.city].filter(Boolean).join(", ")}
                     </p>
                     <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                      {chef.bio ||
-                        `${chef.full_name} has registered interest to cook with Soru.`}
+                      {chef.bio || `${chef.full_name} has registered interest to cook with Soru.`}
                     </p>
                     <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
                       <p>
-                        <span className="font-bold">Speciality:</span>{" "}
-                        {joinList(chef.specialties)}
+                        <span className="font-bold">Speciality:</span> {joinList(chef.specialties)}
                       </p>
                       <p>
                         <span className="font-bold">Cuisines:</span> {joinList(chef.cuisines)}
