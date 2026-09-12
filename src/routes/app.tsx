@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { supabase } from "@/integrations/supabase/client";
+import { getPublicChefProspects } from "@/lib/api/chef-prospects.functions";
 import {
   buildLunchboxSummary,
   buildMealPlanSummary,
@@ -48,6 +49,20 @@ export const Route = createFileRoute("/app")({
 });
 
 type Tab = "explore" | "subscriptions" | "meal-plans" | "lunchbox" | "orders";
+
+async function loadChefRegistrations() {
+  try {
+    const data = await getPublicChefProspects({ data: {} });
+    return { data, error: null };
+  } catch (error) {
+    console.error("[Soru] Could not load merged chef prospects.", error);
+    return db
+      .from<ChefInterestListing>("chef_interest_listings")
+      .select("*")
+      .eq("public_visible", true)
+      .order("created_at", { ascending: false });
+  }
+}
 
 function CustomerAppPage() {
   const navigate = useNavigate();
@@ -86,11 +101,7 @@ function CustomerAppPage() {
     ] = await Promise.all([
       db.from<Profile>("profiles").select("*").eq("user_id", user.id).maybeSingle(),
       db.from<ChefProfile>("chef_profiles").select("*").order("created_at", { ascending: false }),
-      db
-        .from<ChefInterestListing>("chef_interest_listings")
-        .select("*")
-        .eq("public_visible", true)
-        .order("created_at", { ascending: false }),
+      loadChefRegistrations(),
       db
         .from<MenuItem>("chef_menu_items")
         .select("*")
@@ -119,7 +130,8 @@ function CustomerAppPage() {
     ]);
 
     if (profileRes.error) toast.error("Could not load your profile.");
-    if (chefsRes.error || chefRegistrationsRes.error || menusRes.error)
+    if (chefsRes.error || menusRes.error) toast.error("Could not load chefs yet.");
+    if (chefRegistrationsRes.error)
       toast.error("Could not load chefs yet.");
 
     const repairedProfile =
@@ -128,7 +140,7 @@ function CustomerAppPage() {
 
     setProfile(activeProfile);
     setChefs(chefsRes.data || []);
-    setChefRegistrations(chefRegistrationsRes.data || []);
+    setChefRegistrations((chefRegistrationsRes.data as ChefInterestListing[] | null) || []);
     setMenus(menusRes.data || []);
     setOrders(ordersRes.data || []);
     setSubscriptions(subscriptionsRes.data || []);
