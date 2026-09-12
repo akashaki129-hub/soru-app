@@ -116,12 +116,12 @@ type ChefInterestContactRow = {
   full_name: string;
   phone: string;
   email: string;
-  consent_channel: string;
   created_at: string;
 };
 
 type ChefInterestListingRow = {
   id: string;
+  lead_id: string | null;
   created_at: string;
   full_name: string;
   kitchen_name: string | null;
@@ -138,6 +138,25 @@ type ChefInterestListingRow = {
   status: string;
   public_visible: boolean;
   chef_interest_contacts?: ChefInterestContactRow[] | null;
+};
+
+type NewChefInterestListing = {
+  lead_id: string;
+  full_name: string;
+  kitchen_name: string | null;
+  chef_role: string;
+  city: string;
+  area: string | null;
+  bio: string | null;
+  specialties: string[];
+  cuisines: string[];
+  signature_dish: string | null;
+  sample_menu: string | null;
+  expected_price_range: string | null;
+  fssai_status: string;
+  public_visible: boolean;
+  status: string;
+  created_at: string;
 };
 
 type AppChefProfileRow = {
@@ -276,6 +295,7 @@ function AdminPage() {
   const [q, setQ] = useState("");
   const [audienceFilter, setAudienceFilter] = useState("all");
   const [cityFilter, setCityFilter] = useState("all");
+  const [publishingChefLeads, setPublishingChefLeads] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -329,7 +349,7 @@ function AdminPage() {
         supabase
           .from("chef_interest_listings")
           .select(
-            "id,created_at,full_name,kitchen_name,chef_role,city,area,bio,specialties,cuisines,signature_dish,sample_menu,expected_price_range,fssai_status,status,public_visible,chef_interest_contacts(full_name,phone,email,consent_channel,created_at)",
+            "id,lead_id,created_at,full_name,kitchen_name,chef_role,city,area,bio,specialties,cuisines,signature_dish,sample_menu,expected_price_range,fssai_status,status,public_visible,chef_interest_contacts(full_name,phone,email,created_at)",
           )
           .order("created_at", { ascending: false }),
         db
@@ -468,6 +488,11 @@ function AdminPage() {
     });
   }, [chefInterestListings, q]);
 
+  const publishableChefLeads = useMemo(
+    () => buildChefLeadListings(chefs, research, chefInterestListings).rows,
+    [chefInterestListings, chefs, research],
+  );
+
   const operationRows = useMemo<OperationRow[]>(() => {
     const rows: OperationRow[] = [
       ...chefApplications.map((row) => ({
@@ -569,6 +594,40 @@ function AdminPage() {
   async function signOut() {
     await supabase.auth.signOut();
     navigate({ to: "/auth" });
+  }
+
+  async function publishChefLeadsToApp() {
+    const { rows, skipped } = buildChefLeadListings(chefs, research, chefInterestListings);
+    if (rows.length === 0) {
+      toast.info(
+        skipped > 0
+          ? "No new eligible chef leads to publish. Existing or incomplete entries were skipped."
+          : "No eligible chef leads found yet.",
+      );
+      return;
+    }
+
+    setPublishingChefLeads(true);
+    const { data, error } = await supabase
+      .from("chef_interest_listings")
+      .insert(rows)
+      .select(
+        "id,lead_id,created_at,full_name,kitchen_name,chef_role,city,area,bio,specialties,cuisines,signature_dish,sample_menu,expected_price_range,fssai_status,status,public_visible",
+      );
+    setPublishingChefLeads(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    const inserted = (data || []) as ChefInterestListingRow[];
+    setChefInterestListings((current) =>
+      [...inserted, ...current].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      ),
+    );
+    toast.success(`${inserted.length} chef lead${inserted.length === 1 ? "" : "s"} published to the app list.`);
   }
 
   function changeTab(nextTab: AdminTab) {
@@ -849,7 +908,12 @@ function AdminPage() {
         {tab === "research" ? (
           <ResearchDashboard rows={filteredResearch} />
         ) : tab === "applicants" ? (
-          <ChefApplicantsTable rows={filteredChefInterestListings} />
+          <ChefApplicantsTable
+            rows={filteredChefInterestListings}
+            publishableCount={publishableChefLeads.length}
+            publishing={publishingChefLeads}
+            onPublish={publishChefLeadsToApp}
+          />
         ) : tab === "operations" ? (
           <OperationsDashboard
             profiles={appProfiles}
@@ -1251,15 +1315,38 @@ function ResearchDashboard({ rows }: { rows: ResearchRow[] }) {
   );
 }
 
-function ChefApplicantsTable({ rows }: { rows: ChefInterestListingRow[] }) {
+function ChefApplicantsTable({
+  rows,
+  publishableCount,
+  publishing,
+  onPublish,
+}: {
+  rows: ChefInterestListingRow[];
+  publishableCount: number;
+  publishing: boolean;
+  onPublish: () => void;
+}) {
   return (
     <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="border-b border-border px-5 py-4">
-        <h2 className="font-display text-2xl font-medium">Chef applicants</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          One-page registrations shown in the app list. Contact details are visible only here for
-          follow-up.
-        </p>
+      <div className="flex flex-col justify-between gap-4 border-b border-border px-5 py-4 md:flex-row md:items-center">
+        <div>
+          <h2 className="font-display text-2xl font-medium">Chef applicants</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            One-page registrations shown in the app list. Contact details are visible only here for
+            follow-up.
+          </p>
+        </div>
+        <button
+          onClick={onPublish}
+          disabled={publishing || publishableCount === 0}
+          className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {publishing
+            ? "Publishing…"
+            : publishableCount > 0
+              ? `Publish ${publishableCount} chef lead${publishableCount === 1 ? "" : "s"} to app`
+              : "All eligible leads published"}
+        </button>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1100px] text-left text-sm">
@@ -1532,6 +1619,164 @@ function isCustomer(row: ResearchRow) {
 
 function isChef(row: ResearchRow) {
   return row.audience !== "customer";
+}
+
+function buildChefLeadListings(
+  chefEnrollments: ChefRow[],
+  researchRows: ResearchRow[],
+  existingListings: ChefInterestListingRow[],
+): { rows: NewChefInterestListing[]; skipped: number } {
+  const existingLeadIds = new Set(existingListings.map((row) => row.id));
+  existingListings.forEach((row) => {
+    if (row.lead_id) existingLeadIds.add(row.lead_id);
+  });
+
+  const existingNames = new Set(
+    existingListings.map((row) => normalizeComparable(`${row.full_name}|${row.city}`)),
+  );
+  const rows: NewChefInterestListing[] = [];
+  let skipped = 0;
+
+  for (const row of chefEnrollments) {
+    if (existingLeadIds.has(row.id) || !isUsablePersonName(row.name) || getPhoneValidationError(row.phone)) {
+      skipped += 1;
+      continue;
+    }
+
+    const listing = {
+      lead_id: row.id,
+      full_name: row.name.trim(),
+      kitchen_name: null,
+      chef_role: mapChefRole(row.role),
+      city: "City to confirm",
+      area: null,
+      bio: cleanOptionalText(row.comments) || "Joined Soru as a chef applicant.",
+      specialties: [formatLabel(row.role)],
+      cuisines: [],
+      signature_dish: null,
+      sample_menu: cleanOptionalText(row.comments),
+      expected_price_range: null,
+      fssai_status: "need_guidance",
+      public_visible: true,
+      status: "submitted",
+      created_at: row.created_at,
+    };
+
+    const key = normalizeComparable(`${listing.full_name}|${listing.city}`);
+    if (existingNames.has(key)) {
+      skipped += 1;
+      continue;
+    }
+
+    existingNames.add(key);
+    rows.push(listing);
+  }
+
+  for (const row of researchRows) {
+    if (
+      existingLeadIds.has(row.id) ||
+      !isChef(row) ||
+      !isUsablePersonName(row.full_name || "") ||
+      !isUsableContact(row.contact || "")
+    ) {
+      skipped += 1;
+      continue;
+    }
+
+    const city = row.city === "Other" ? "City to confirm" : row.city;
+    const listing = {
+      lead_id: row.id,
+      full_name: row.full_name!.trim(),
+      kitchen_name: null,
+      chef_role: mapChefRole(row.audience),
+      city,
+      area: null,
+      bio: buildResearchBio(row),
+      specialties: buildResearchSpecialties(row),
+      cuisines: [],
+      signature_dish: null,
+      sample_menu: cleanOptionalText(row.comments),
+      expected_price_range: null,
+      fssai_status: row.chef_support_needs.includes("food_license") ? "need_guidance" : "not_started",
+      public_visible: true,
+      status: row.chef_start_timeline === "exploring" ? "reviewing" : "submitted",
+      created_at: row.created_at,
+    };
+
+    const key = normalizeComparable(`${listing.full_name}|${listing.city}`);
+    if (existingNames.has(key)) {
+      skipped += 1;
+      continue;
+    }
+
+    existingNames.add(key);
+    rows.push(listing);
+  }
+
+  return { rows, skipped };
+}
+
+function buildResearchBio(row: ResearchRow) {
+  const comment = cleanOptionalText(row.comments);
+  if (comment) return comment;
+  if (row.statements.includes("earn_from_cooking")) {
+    return "Shared interest in earning through Soru as a skilled cook.";
+  }
+  if (row.chef_start_timeline === "ready_now") {
+    return "Ready to start building a food business with Soru.";
+  }
+  return "Shared chef interest through Soru market feedback.";
+}
+
+function buildResearchSpecialties(row: ResearchRow) {
+  const specialties = new Set<string>();
+  specialties.add(AUDIENCE_LABELS[row.audience] || "Chef applicant");
+  if (row.statements.includes("earn_from_cooking")) specialties.add("Cooking skills");
+  if (row.statements.includes("direct_from_chefs")) specialties.add("Chef-led meals");
+  if (row.statements.includes("personalized_nutrition")) specialties.add("Personalized meals");
+  if (row.chef_support_needs.includes("subscriptions")) specialties.add("Meal subscriptions");
+  if (row.chef_support_needs.includes("menu_pricing")) specialties.add("Menu development");
+  return Array.from(specialties).slice(0, 5);
+}
+
+function mapChefRole(value: string) {
+  const normalized = value.toLowerCase();
+  if (normalized.includes("professional") || normalized.includes("caterer")) return "professional_chef";
+  if (normalized.includes("student")) return "culinary_student";
+  if (normalized.includes("home") || normalized.includes("homemaker")) return "home_cook";
+  if (normalized.includes("both")) return "home_cook";
+  return "home_cook";
+}
+
+function isUsablePersonName(value: string) {
+  const text = value.trim();
+  if (text.length < 2 || text.length > 120) return false;
+  if (!/[a-z]/i.test(text)) return false;
+  if (/^(test|testing|demo|sample|asdf|qwerty|none|null|na|n\/a)$/i.test(text)) return false;
+  return true;
+}
+
+function isUsableContact(value: string) {
+  const text = value.trim();
+  if (text.length < 3 || text.length > 255) return false;
+  if (/^[0-9]{3,}$/.test(text.replace(/\D/g, ""))) {
+    return !getPhoneValidationError(text);
+  }
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(text) || text.replace(/\D/g, "").length >= 10;
+}
+
+function cleanOptionalText(value: string | null) {
+  const text = value?.trim();
+  if (!text) return null;
+  return text.length > 420 ? `${text.slice(0, 417)}…` : text;
+}
+
+function normalizeComparable(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function downloadCsv(headers: readonly string[], rows: string[][], filename: string) {
