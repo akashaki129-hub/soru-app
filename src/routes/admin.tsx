@@ -78,6 +78,7 @@ type SiteVisitRow = {
   visitor_id: string;
   session_id: string;
   path: string;
+  referrer_host: string | null;
   visited_at: string;
 };
 
@@ -225,7 +226,14 @@ type OperationRow = {
   status: string;
 };
 
-type AdminTab = "chefs" | "applicants" | "customers" | "waitlist" | "research" | "operations";
+type AdminTab =
+  | "chefs"
+  | "applicants"
+  | "customers"
+  | "waitlist"
+  | "research"
+  | "operations"
+  | "traffic";
 type EnrollmentRow = ChefRow | CustRow | WaitlistRow;
 
 const STATEMENT_LABELS: Record<string, string> = {
@@ -317,7 +325,6 @@ function AdminPage() {
         return;
       }
 
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const [c, cu, w, r, v, n, p, ca, ci, cp, m, o, s, mp, lb] = await Promise.all([
         supabase.from("chef_enrollments").select("*").order("created_at", { ascending: false }),
         supabase.from("customer_enrollments").select("*").order("created_at", { ascending: false }),
@@ -326,11 +333,7 @@ function AdminPage() {
           .from("market_research_responses")
           .select("*")
           .order("created_at", { ascending: false }),
-        supabase
-          .from("site_visits")
-          .select("id,visitor_id,session_id,path,visited_at")
-          .gte("visited_at", thirtyDaysAgo)
-          .order("visited_at", { ascending: false }),
+        loadAllSiteVisits(),
         supabase
           .from("notification_events")
           .select("id,event_type,email_status,whatsapp_status,processed_at,created_at")
@@ -589,6 +592,24 @@ function AdminPage() {
   const sevenDayVisits = visits.filter(
     (visit) => new Date(visit.visited_at).getTime() >= sevenDaysAgo,
   );
+  const filteredVisits = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return visits.filter(
+      (visit) =>
+        !query ||
+        [
+          visit.path,
+          visit.referrer_host,
+          visit.visitor_id,
+          visit.session_id,
+          new Date(visit.visited_at).toLocaleString(),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(query),
+    );
+  }, [q, visits]);
   const queuedNotifications = notificationEvents.filter((event) => !event.processed_at).length;
 
   async function signOut() {
@@ -627,7 +648,9 @@ function AdminPage() {
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       ),
     );
-    toast.success(`${inserted.length} chef lead${inserted.length === 1 ? "" : "s"} published to the app list.`);
+    toast.success(
+      `${inserted.length} chef lead${inserted.length === 1 ? "" : "s"} published to the app list.`,
+    );
   }
 
   function changeTab(nextTab: AdminTab) {
@@ -724,6 +747,23 @@ function AdminPage() {
           }),
         ),
         "market-research",
+      );
+      return;
+    }
+
+    if (tab === "traffic") {
+      const headers: Array<keyof SiteVisitRow> = [
+        "visited_at",
+        "path",
+        "referrer_host",
+        "visitor_id",
+        "session_id",
+        "id",
+      ];
+      downloadCsv(
+        headers,
+        filteredVisits.map((row) => headers.map((header) => String(row[header] ?? ""))),
+        "site-visit-history",
       );
       return;
     }
@@ -856,6 +896,9 @@ function AdminPage() {
           <TabBtn active={tab === "research"} onClick={() => changeTab("research")}>
             Research ({research.length})
           </TabBtn>
+          <TabBtn active={tab === "traffic"} onClick={() => changeTab("traffic")}>
+            Traffic ({visits.length})
+          </TabBtn>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -907,6 +950,8 @@ function AdminPage() {
 
         {tab === "research" ? (
           <ResearchDashboard rows={filteredResearch} />
+        ) : tab === "traffic" ? (
+          <TrafficDashboard rows={filteredVisits} allRows={visits} />
         ) : tab === "applicants" ? (
           <ChefApplicantsTable
             rows={filteredChefInterestListings}
@@ -957,6 +1002,203 @@ function TrafficCard({
       <div className="mt-4 font-display text-4xl font-medium">{value.toLocaleString("en-IN")}</div>
       <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
     </article>
+  );
+}
+
+function TrafficDashboard({ rows, allRows }: { rows: SiteVisitRow[]; allRows: SiteVisitRow[] }) {
+  const firstVisit = allRows.length ? allRows[allRows.length - 1] : null;
+  const latestVisit = allRows[0] || null;
+  const dailyRows = buildDailyVisitRows(rows);
+  const allDailyRows = buildDailyVisitRows(allRows);
+  const topPages = buildTopVisitRows(rows, (row) => row.path || "/");
+  const topReferrers = buildTopVisitRows(rows, (row) => row.referrer_host || "Direct / unknown");
+  const uniqueVisitors = new Set(rows.map((row) => row.visitor_id)).size;
+  const sessions = new Set(rows.map((row) => row.session_id)).size;
+  const allTimeVisitors = new Set(allRows.map((row) => row.visitor_id)).size;
+  const allTimeSessions = new Set(allRows.map((row) => row.session_id)).size;
+  const dateRange =
+    firstVisit && latestVisit
+      ? `${new Date(firstVisit.visited_at).toLocaleDateString("en-IN")} – ${new Date(latestVisit.visited_at).toLocaleDateString("en-IN")}`
+      : "No visits recorded yet";
+
+  return (
+    <div className="mt-7 space-y-6">
+      <div className="rounded-3xl bg-[color:var(--ink)] p-6 text-white md:p-8">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.16em] text-[color:var(--saffron)]">
+              <Eye className="size-4" /> Visitor history
+            </div>
+            <h2 className="mt-3 font-display text-3xl font-medium md:text-4xl">
+              Website visits since tracking began
+            </h2>
+          </div>
+          <p className="max-w-lg text-sm leading-6 text-white/55">
+            All-time recorded range: <strong className="text-white">{dateRange}</strong>. Search
+            filters this view; export CSV keeps the visible rows.
+          </p>
+        </div>
+        <div className="mt-7 grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-2 xl:grid-cols-4">
+          <DarkStat label="All-time visitors" value={allTimeVisitors} />
+          <DarkStat label="All-time sessions" value={allTimeSessions} />
+          <DarkStat label="All-time page views" value={allRows.length} />
+          <DarkStat label="Tracked days" value={allDailyRows.length} />
+        </div>
+      </div>
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <OperationMetric
+          icon={Users}
+          label="Visible visitors"
+          value={uniqueVisitors}
+          detail="Unique visitor IDs in this filtered view"
+        />
+        <OperationMetric
+          icon={Activity}
+          label="Visible sessions"
+          value={sessions}
+          detail="Distinct browsing sessions"
+        />
+        <OperationMetric
+          icon={Eye}
+          label="Visible page views"
+          value={rows.length}
+          detail="Every recorded route view"
+        />
+        <OperationMetric
+          icon={BarChart3}
+          label="Avg. pages/session"
+          value={sessions ? Math.round((rows.length / sessions) * 10) / 10 : 0}
+          detail="Filtered view"
+        />
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_.85fr]">
+        <section className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="font-display text-2xl font-medium">Daily visit history</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Newest days first. Use Export CSV for the complete raw visit history.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Unique visitors</th>
+                  <th className="px-4 py-3">Sessions</th>
+                  <th className="px-4 py-3">Page views</th>
+                  <th className="px-4 py-3">Top page</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
+                      No visits match this view yet.
+                    </td>
+                  </tr>
+                ) : (
+                  dailyRows.slice(0, 90).map((row) => (
+                    <tr key={row.date} className="border-t border-border">
+                      <td className="whitespace-nowrap px-4 py-4 font-medium">{row.date}</td>
+                      <td className="px-4 py-4">{row.visitors.toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-4">{row.sessions.toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-4">{row.pageViews.toLocaleString("en-IN")}</td>
+                      <td className="max-w-xs px-4 py-4 text-muted-foreground">{row.topPage}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div className="space-y-6">
+          <VisitRankCard title="Top pages" rows={topPages} />
+          <VisitRankCard title="Top referrers" rows={topReferrers} />
+        </div>
+      </div>
+
+      <section className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="font-display text-2xl font-medium">Recent page visits</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Privacy-safe visit log: no names, phone numbers, emails, or IP addresses.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] text-left text-sm">
+            <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Time</th>
+                <th className="px-4 py-3">Page</th>
+                <th className="px-4 py-3">Referrer</th>
+                <th className="px-4 py-3">Visitor ID</th>
+                <th className="px-4 py-3">Session ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
+                    No visits match this view yet.
+                  </td>
+                </tr>
+              ) : (
+                rows.slice(0, 150).map((row) => (
+                  <tr key={row.id} className="border-t border-border align-top">
+                    <td className="whitespace-nowrap px-4 py-4 text-xs text-muted-foreground">
+                      {new Date(row.visited_at).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-4 font-medium">{row.path}</td>
+                    <td className="px-4 py-4 text-muted-foreground">
+                      {row.referrer_host || "Direct / unknown"}
+                    </td>
+                    <td className="px-4 py-4 font-mono text-xs text-muted-foreground">
+                      {shortId(row.visitor_id)}
+                    </td>
+                    <td className="px-4 py-4 font-mono text-xs text-muted-foreground">
+                      {shortId(row.session_id)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function VisitRankCard({ title, rows }: { title: string; rows: VisitRankRow[] }) {
+  const max = Math.max(...rows.map((row) => row.count), 1);
+  return (
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-soft)]">
+      <h3 className="font-display text-2xl font-medium">{title}</h3>
+      <div className="mt-5 space-y-4">
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No visit data yet.</p>
+        ) : (
+          rows.slice(0, 8).map((row) => (
+            <div key={row.label}>
+              <div className="flex justify-between gap-3 text-xs">
+                <span className="truncate font-medium">{row.label}</span>
+                <span className="text-muted-foreground">{row.count.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${Math.max(4, Math.round((row.count / max) * 100))}%` }}
+                />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -1443,7 +1685,7 @@ function EnrollmentTable({
   tab,
   rows,
 }: {
-  tab: Exclude<AdminTab, "applicants" | "research" | "operations">;
+  tab: Exclude<AdminTab, "applicants" | "research" | "operations" | "traffic">;
   rows: EnrollmentRow[];
 }) {
   return (
@@ -1603,6 +1845,14 @@ function DistributionBar({
 }
 
 type Metric = { count: number; sample: number; percent: number };
+type DailyVisitRow = {
+  date: string;
+  visitors: number;
+  sessions: number;
+  pageViews: number;
+  topPage: string;
+};
+type VisitRankRow = { label: string; count: number };
 
 function metric(rows: ResearchRow[], predicate: (row: ResearchRow) => boolean): Metric {
   const count = rows.filter(predicate).length;
@@ -1638,7 +1888,11 @@ function buildChefLeadListings(
   let skipped = 0;
 
   for (const row of chefEnrollments) {
-    if (existingLeadIds.has(row.id) || !isUsablePersonName(row.name) || getPhoneValidationError(row.phone)) {
+    if (
+      existingLeadIds.has(row.id) ||
+      !isUsablePersonName(row.name) ||
+      getPhoneValidationError(row.phone)
+    ) {
       skipped += 1;
       continue;
     }
@@ -1697,7 +1951,9 @@ function buildChefLeadListings(
       signature_dish: null,
       sample_menu: cleanOptionalText(row.comments),
       expected_price_range: null,
-      fssai_status: row.chef_support_needs.includes("food_license") ? "need_guidance" : "not_started",
+      fssai_status: row.chef_support_needs.includes("food_license")
+        ? "need_guidance"
+        : "not_started",
       public_visible: true,
       status: row.chef_start_timeline === "exploring" ? "reviewing" : "submitted",
       created_at: row.created_at,
@@ -1741,7 +1997,8 @@ function buildResearchSpecialties(row: ResearchRow) {
 
 function mapChefRole(value: string) {
   const normalized = value.toLowerCase();
-  if (normalized.includes("professional") || normalized.includes("caterer")) return "professional_chef";
+  if (normalized.includes("professional") || normalized.includes("caterer"))
+    return "professional_chef";
   if (normalized.includes("student")) return "culinary_student";
   if (normalized.includes("home") || normalized.includes("homemaker")) return "home_cook";
   if (normalized.includes("both")) return "home_cook";
@@ -1779,6 +2036,87 @@ function normalizeComparable(value: string) {
     .trim();
 }
 
+async function loadAllSiteVisits() {
+  const pageSize = 1000;
+  const rows: SiteVisitRow[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from("site_visits")
+      .select("id,visitor_id,session_id,path,referrer_host,visited_at")
+      .order("visited_at", { ascending: false })
+      .range(from, to);
+
+    if (error) return { data: null, error };
+    rows.push(...((data || []) as SiteVisitRow[]));
+    if (!data || data.length < pageSize) break;
+  }
+
+  return { data: rows, error: null };
+}
+
+function buildDailyVisitRows(rows: SiteVisitRow[]): DailyVisitRow[] {
+  const days = new Map<
+    string,
+    {
+      visitors: Set<string>;
+      sessions: Set<string>;
+      pageViews: number;
+      paths: Map<string, number>;
+    }
+  >();
+
+  for (const row of rows) {
+    const date = indiaDateKey(new Date(row.visited_at));
+    const entry =
+      days.get(date) ||
+      ({
+        visitors: new Set<string>(),
+        sessions: new Set<string>(),
+        pageViews: 0,
+        paths: new Map<string, number>(),
+      } satisfies {
+        visitors: Set<string>;
+        sessions: Set<string>;
+        pageViews: number;
+        paths: Map<string, number>;
+      });
+
+    entry.visitors.add(row.visitor_id);
+    entry.sessions.add(row.session_id);
+    entry.pageViews += 1;
+    entry.paths.set(row.path, (entry.paths.get(row.path) || 0) + 1);
+    days.set(date, entry);
+  }
+
+  return Array.from(days.entries())
+    .map(([date, entry]) => ({
+      date,
+      visitors: entry.visitors.size,
+      sessions: entry.sessions.size,
+      pageViews: entry.pageViews,
+      topPage:
+        Array.from(entry.paths.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || "No page data",
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function buildTopVisitRows(rows: SiteVisitRow[], getLabel: (row: SiteVisitRow) => string) {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const label = getLabel(row);
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+function shortId(value: string) {
+  return value.length > 13 ? `${value.slice(0, 8)}…${value.slice(-4)}` : value;
+}
+
 function downloadCsv(headers: readonly string[], rows: string[][], filename: string) {
   const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
   const lines = [headers.map(escape).join(","), ...rows.map((row) => row.map(escape).join(","))];
@@ -1805,7 +2143,7 @@ function getEnrollmentValue(row: EnrollmentRow, header: string) {
 
 function getEnrollmentCategory(
   row: EnrollmentRow,
-  tab: Exclude<AdminTab, "applicants" | "research" | "operations">,
+  tab: Exclude<AdminTab, "applicants" | "research" | "operations" | "traffic">,
 ) {
   if (tab === "chefs" && "role" in row) return formatLabel(row.role);
   if (tab === "customers" && "preferred_service" in row) return row.preferred_service;
