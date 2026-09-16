@@ -25,6 +25,7 @@ import {
   ensureProfileForUser,
   formatAiRecommendation,
   generateAiRecommendation,
+  generateSoruSmartRecommendation,
   getCurrentUser,
   joinList,
   lunchboxGoalOptions,
@@ -183,6 +184,9 @@ function CustomerAppPage() {
     });
   }, [chefRegistrations, cityFilter]);
 
+  const totalChefSupply = chefs.length + chefRegistrations.length;
+  const openRequests = orders.length + subscriptions.length + mealPlans.length + lunchboxes.length;
+
   async function createOrder(menu: MenuItem, chef: ChefProfile) {
     if (!profile?.city) {
       toast.error("Add your city in your profile before placing an order request.");
@@ -214,26 +218,56 @@ function CustomerAppPage() {
     <div className="mobile-app-screen min-h-screen bg-background">
       <AppHeader onSignOut={signOut} profile={profile} />
       <main className="container-x py-5 md:py-10">
-        <section className="rounded-[1.6rem] border border-border bg-card p-5 shadow-soft md:rounded-[2rem] md:p-8">
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+        <section className="overflow-hidden rounded-[1.8rem] border border-primary/20 bg-[radial-gradient(circle_at_top_left,rgba(255,184,0,0.22),transparent_34%),linear-gradient(135deg,var(--card),var(--background))] p-5 shadow-soft md:rounded-[2.2rem] md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
-                Customer dashboard
+              <p className="inline-flex rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-foreground">
+                Soru marketplace
               </p>
-              <h1 className="mt-3 text-3xl font-semibold leading-none md:text-5xl">
-                Food that fits your life.
+              <h1 className="mt-5 max-w-3xl text-balance text-4xl font-semibold leading-[0.95] tracking-[-0.045em] md:text-6xl">
+                Food that fits your life — powered by real chefs.
               </h1>
-              <p className="mt-3 max-w-2xl text-muted-foreground">
-                Explore nearby chefs, request subscriptions, personalize nutrition plans, and build
-                healthy lunchboxes for kids.
+              <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+                Discover chef registrations, request subscriptions, generate zero-cost Soru Smart
+                meal guidance, and build healthier lunchboxes from one premium dashboard.
               </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <HeroChip>Zero-cost Soru Smart Engine active</HeroChip>
+                <HeroChip>OpenAI-ready later</HeroChip>
+                <HeroChip>Allergy-aware briefs</HeroChip>
+              </div>
             </div>
-            <Link
-              to="/chef-studio"
-              className="inline-flex items-center justify-center rounded-full border border-border bg-background px-5 py-3 text-sm font-bold hover:bg-muted"
-            >
-              I’m also a chef
-            </Link>
+            <div className="grid gap-3 sm:grid-cols-3 lg:w-[28rem] lg:grid-cols-1">
+              <AppStat label="Chef supply" value={totalChefSupply} detail="Live + onboarding" />
+              <AppStat label="Menu items" value={menus.length} detail="Published by chefs" />
+              <AppStat
+                label="Your requests"
+                value={openRequests}
+                detail="Plans, orders, lunchbox"
+              />
+            </div>
+          </div>
+          <div className="mt-7 grid gap-3 md:grid-cols-4">
+            <QuickAction
+              title="Explore chefs"
+              text="See nearby verified chefs and new applicants."
+              onClick={() => setTab("explore")}
+            />
+            <QuickAction
+              title="Monthly plan"
+              text="Request weekday, office, student, or family meals."
+              onClick={() => setTab("subscriptions")}
+            />
+            <QuickAction
+              title="Smart meal plan"
+              text="Generate a chef-ready recommendation now."
+              onClick={() => setTab("meal-plans")}
+            />
+            <QuickAction
+              title="Kids lunchbox"
+              text="Turn preferences into healthier lunchbox ideas."
+              onClick={() => setTab("lunchbox")}
+            />
           </div>
         </section>
 
@@ -350,6 +384,45 @@ function AppHeader({ profile, onSignOut }: { profile: Profile | null; onSignOut:
         </div>
       </div>
     </header>
+  );
+}
+
+function HeroChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full border border-border/70 bg-card/75 px-3 py-1.5 text-xs font-bold text-foreground shadow-sm">
+      {children}
+    </span>
+  );
+}
+
+function AppStat({ label, value, detail }: { label: string; value: number; detail: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-3xl font-extrabold tracking-tight">{value.toLocaleString("en-IN")}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function QuickAction({
+  title,
+  text,
+  onClick,
+}: {
+  title: string;
+  text: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl border border-border bg-card/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-soft"
+    >
+      <p className="font-bold">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{text}</p>
+    </button>
   );
 }
 
@@ -499,14 +572,38 @@ function ExploreSection({
   createOrder: (menu: MenuItem, chef: ChefProfile) => void;
   saving: boolean;
 }) {
+  const [view, setView] = useState<"all" | "registered" | "listed">("all");
+  const shownRegistrations = view === "listed" ? [] : chefRegistrations;
+  const shownChefs = view === "registered" ? [] : chefs;
+
   return (
     <section className="mt-6 grid gap-6 lg:grid-cols-[18rem_1fr]">
       <aside className="h-fit rounded-3xl border border-border bg-card p-5 shadow-soft">
-        <h2 className="text-xl font-semibold">Closest chefs</h2>
+        <h2 className="text-xl font-semibold">Chef discovery</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          We sort by your city first. Actual distance matching can be connected once chef addresses
-          are verified.
+          Search by city and browse the real chef pipeline: listed chefs plus new applicants being
+          reviewed by Soru.
         </p>
+        <div className="mt-5 grid grid-cols-3 gap-2 lg:grid-cols-1">
+          {[
+            ["all", "All"],
+            ["registered", "New"],
+            ["listed", "Listed"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setView(value as "all" | "registered" | "listed")}
+              className={`rounded-2xl border px-3 py-2 text-xs font-bold ${
+                view === value
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-muted-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <label className="mt-5 block">
           <span className="mb-1.5 block text-sm font-semibold">City / area</span>
           <input
@@ -516,20 +613,29 @@ function ExploreSection({
             placeholder="Search city"
           />
         </label>
+        <div className="mt-5 rounded-2xl border border-primary/20 bg-primary/10 p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
+            Current supply
+          </p>
+          <p className="mt-2 text-2xl font-extrabold">{chefs.length + chefRegistrations.length}</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {chefRegistrations.length} onboarding · {chefs.length} listed profiles
+          </p>
+        </div>
       </aside>
 
       <div className="space-y-5">
-        {chefs.length === 0 && chefRegistrations.length === 0 ? (
+        {shownChefs.length === 0 && shownRegistrations.length === 0 ? (
           <EmptyCard
             title="No chefs listed yet"
             text="Once chefs or home cooks register, they will appear here."
           />
         ) : (
           <>
-            {chefRegistrations.map((chef) => (
+            {shownRegistrations.map((chef) => (
               <article
                 key={chef.id}
-                className="rounded-3xl border border-primary/25 bg-card p-5 shadow-soft md:p-6"
+                className="rounded-3xl border border-primary/25 bg-[linear-gradient(135deg,var(--card),rgba(255,184,0,0.06))] p-5 shadow-soft md:p-6"
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
@@ -538,7 +644,7 @@ function ExploreSection({
                         {chef.kitchen_name || chef.full_name}
                       </h3>
                       <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-foreground">
-                        New chef registration
+                        Soru review pipeline
                       </span>
                     </div>
                     <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -567,6 +673,11 @@ function ExploreSection({
                   </div>
                   <ChefHat className="size-10 text-primary" />
                 </div>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <StatusPill status={chef.fssai_status || "fssai_pending"} />
+                  <StatusPill status={chef.status || "submitted"} />
+                  <StatusPill status="contact_private" />
+                </div>
                 <div className="mt-5 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 text-sm text-muted-foreground">
                   <span className="font-bold text-foreground">Sample menu:</span>{" "}
                   {chef.sample_menu || "Menu to be published after onboarding."}
@@ -578,7 +689,7 @@ function ExploreSection({
               </article>
             ))}
 
-            {chefs.map((chef) => {
+            {shownChefs.map((chef) => {
               const chefMenus = menus.filter((menu) => menu.chef_profile_id === chef.id);
               return (
                 <article
@@ -912,21 +1023,33 @@ function MealPlanSection({
     }
 
     let aiSaved = false;
+    let usedSmartFallback = false;
     try {
-      const ai = await generateAiRecommendation({
-        kind: "meal_plan",
-        payload: {
-          goal: form.goal,
-          nutrition_focus: focus,
-          diet_type: form.diet_type,
-          allergies: form.allergies,
-          meals_per_day: Number(form.meals_per_day),
-          budget_range: form.budget_range,
-          city: form.city,
-          notes: form.notes,
-        },
-      });
-      const aiSummary = formatAiRecommendation(ai.recommendation);
+      const payload = {
+        goal: form.goal,
+        nutrition_focus: focus,
+        diet_type: form.diet_type,
+        allergies: form.allergies,
+        meals_per_day: Number(form.meals_per_day),
+        budget_range: form.budget_range,
+        city: form.city,
+        notes: form.notes,
+      };
+      let recommendation;
+      try {
+        const ai = await generateAiRecommendation({
+          kind: "meal_plan",
+          payload,
+        });
+        recommendation = ai.recommendation;
+      } catch {
+        recommendation = generateSoruSmartRecommendation({
+          kind: "meal_plan",
+          payload,
+        });
+        usedSmartFallback = true;
+      }
+      const aiSummary = formatAiRecommendation(recommendation);
       if (savedRequest?.id) {
         const update = await db
           .from<MealPlanRequest>("meal_plan_requests")
@@ -940,7 +1063,9 @@ function MealPlanSection({
     setSaving(false);
     toast.success(
       aiSaved
-        ? "Meal-plan request saved with AI recommendation."
+        ? usedSmartFallback
+          ? "Meal-plan request saved with Soru Smart recommendation."
+          : "Meal-plan request saved with AI recommendation."
         : "Meal-plan request saved. AI is temporarily unavailable, so Soru saved your brief for follow-up.",
     );
     await afterSave();
@@ -952,7 +1077,7 @@ function MealPlanSection({
         <SectionTitle
           icon={<Sparkles />}
           title="Personalised nutrition meal plans"
-          text="Tell Soru your goal, allergies, budget, and food style. AI creates a chef-ready recommendation."
+          text="Tell Soru your goal, allergies, budget, and food style. Soru Smart creates a chef-ready recommendation now, with OpenAI ready to plug in later."
         />
         <AiDisclaimer />
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -1033,7 +1158,7 @@ function MealPlanSection({
           disabled={saving}
           className="mt-5 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
         >
-          {saving ? "Saving request…" : "Generate AI meal plan"}
+          {saving ? "Building recommendation…" : "Generate Soru Smart meal plan"}
         </button>
       </form>
 
@@ -1106,21 +1231,33 @@ function LunchboxSection({
     }
 
     let aiSaved = false;
+    let usedSmartFallback = false;
     try {
-      const ai = await generateAiRecommendation({
-        kind: "lunchbox",
-        payload: {
-          child_age: form.child_age,
-          preferences: form.preferences,
-          dislikes: form.dislikes,
-          allergies: form.allergies,
-          health_goals: goals,
-          school_timing: form.school_timing,
-          budget_range: form.budget_range,
-          city: form.city,
-        },
-      });
-      const recommendation = formatAiRecommendation(ai.recommendation);
+      const payload = {
+        child_age: form.child_age,
+        preferences: form.preferences,
+        dislikes: form.dislikes,
+        allergies: form.allergies,
+        health_goals: goals,
+        school_timing: form.school_timing,
+        budget_range: form.budget_range,
+        city: form.city,
+      };
+      let smartRecommendation;
+      try {
+        const ai = await generateAiRecommendation({
+          kind: "lunchbox",
+          payload,
+        });
+        smartRecommendation = ai.recommendation;
+      } catch {
+        smartRecommendation = generateSoruSmartRecommendation({
+          kind: "lunchbox",
+          payload,
+        });
+        usedSmartFallback = true;
+      }
+      const recommendation = formatAiRecommendation(smartRecommendation);
       if (savedRequest?.id) {
         const update = await db
           .from<LunchboxRequest>("lunchbox_requests")
@@ -1134,7 +1271,9 @@ function LunchboxSection({
     setSaving(false);
     toast.success(
       aiSaved
-        ? "Lunchbox request saved with AI recommendation."
+        ? usedSmartFallback
+          ? "Lunchbox request saved with Soru Smart recommendation."
+          : "Lunchbox request saved with AI recommendation."
         : "Lunchbox request saved. AI is temporarily unavailable, so Soru saved your brief for follow-up.",
     );
     await afterSave();
@@ -1146,7 +1285,7 @@ function LunchboxSection({
         <SectionTitle
           icon={<HeartPulse />}
           title="Kids lunchbox customization"
-          text="AI turns kids’ preferences into healthier chef-ready lunchbox recommendations."
+          text="Soru Smart turns kids’ preferences into healthier chef-ready lunchbox recommendations."
         />
         <AiDisclaimer />
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -1215,7 +1354,7 @@ function LunchboxSection({
           disabled={saving}
           className="mt-5 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
         >
-          {saving ? "Generating AI recommendation…" : "Generate AI lunchbox plan"}
+          {saving ? "Generating recommendation…" : "Generate Soru Smart lunchbox plan"}
         </button>
       </form>
 
@@ -1279,8 +1418,9 @@ function OrdersSection({
 function AiDisclaimer() {
   return (
     <div className="mt-5 rounded-2xl border border-primary/25 bg-primary/10 p-4 text-sm leading-6 text-foreground">
-      Soru’s AI suggestions provide general food guidance and are not medical or clinical nutrition
-      advice.
+      Soru Smart currently uses a zero-cost rules engine. If Gemini/OpenAI is connected later, the
+      same brief can be enhanced by a model. Guidance is general food planning, not medical or
+      clinical nutrition advice.
     </div>
   );
 }

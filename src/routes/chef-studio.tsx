@@ -145,6 +145,8 @@ function ChefStudioPage() {
     if (!application) return 0;
     return Math.round((application.current_step / 5) * 100);
   }, [application]);
+  const activeMenus = menus.filter((menu) => menu.is_active).length;
+  const openDemand = orders.length + subscriptions.length;
 
   return (
     <div className="mobile-app-screen min-h-screen bg-background">
@@ -178,26 +180,60 @@ function ChefStudioPage() {
       </header>
 
       <main className="container-x py-5 md:py-10">
-        <section className="rounded-[1.6rem] border border-border bg-card p-5 shadow-soft md:rounded-[2rem] md:p-8">
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+        <section className="overflow-hidden rounded-[1.8rem] border border-primary/20 bg-[radial-gradient(circle_at_top_left,rgba(255,184,0,0.2),transparent_34%),linear-gradient(135deg,var(--card),var(--background))] p-5 shadow-soft md:rounded-[2.2rem] md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
-                Chef Studio
+              <p className="inline-flex rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-foreground">
+                Chef business studio
               </p>
-              <h1 className="mt-3 text-3xl font-semibold leading-none md:text-5xl">
+              <h1 className="mt-5 max-w-3xl text-balance text-4xl font-semibold leading-[0.95] tracking-[-0.045em] md:text-6xl">
                 Build your chef business on Soru.
               </h1>
-              <p className="mt-3 max-w-2xl text-muted-foreground">
-                Apply to work with Soru, prepare your FSSAI readiness, publish your menu, and manage
-                customer interest from one place.
+              <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+                Apply, prepare FSSAI readiness, publish a signature menu, and turn cooking skill
+                into a visible earning opportunity.
               </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <StudioChip>FSSAI guidance</StudioChip>
+                <StudioChip>Menu builder</StudioChip>
+                <StudioChip>Subscription-ready</StudioChip>
+              </div>
             </div>
-            <div className="rounded-2xl bg-primary/15 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                Enrollment
-              </p>
-              <p className="mt-1 text-2xl font-extrabold">{progress}%</p>
+            <div className="grid gap-3 sm:grid-cols-3 lg:w-[28rem] lg:grid-cols-1">
+              <StudioStat label="Enrollment" value={`${progress}%`} detail="Application progress" />
+              <StudioStat
+                label="Active menu"
+                value={String(activeMenus)}
+                detail={`${menus.length} items total`}
+              />
+              <StudioStat
+                label="Customer demand"
+                value={String(openDemand)}
+                detail="Orders + subscriptions"
+              />
             </div>
+          </div>
+          <div className="mt-7 grid gap-3 md:grid-cols-4">
+            <StudioAction
+              title="Complete application"
+              text="Submit profile, cooking role, FSSAI status, and documents."
+              onClick={() => setTab("enrollment")}
+            />
+            <StudioAction
+              title="Polish profile"
+              text="Set kitchen name, cuisines, specialties, and public identity."
+              onClick={() => setTab("profile")}
+            />
+            <StudioAction
+              title="Publish menu"
+              text="Add signature dishes, prices, allergens, and dietary tags."
+              onClick={() => setTab("menu")}
+            />
+            <StudioAction
+              title="Manage demand"
+              text="Review customer orders and subscriptions in one place."
+              onClick={() => setTab("orders")}
+            />
           </div>
         </section>
 
@@ -261,6 +297,45 @@ function ChefStudioPage() {
       </main>
       <ChefMobileTabBar active={tab} setTab={setTab} />
     </div>
+  );
+}
+
+function StudioChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full border border-border/70 bg-card/75 px-3 py-1.5 text-xs font-bold text-foreground shadow-sm">
+      {children}
+    </span>
+  );
+}
+
+function StudioStat({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-3xl font-extrabold tracking-tight">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function StudioAction({
+  title,
+  text,
+  onClick,
+}: {
+  title: string;
+  text: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl border border-border bg-card/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-soft"
+    >
+      <p className="font-bold">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{text}</p>
+    </button>
   );
 }
 
