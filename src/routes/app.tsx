@@ -30,6 +30,7 @@ import {
   joinList,
   lunchboxGoalOptions,
   nutritionFocusOptions,
+  titleCase,
   type ChefInterestListing,
   type ChefProfile,
   type CustomerOrder,
@@ -659,7 +660,7 @@ function ExploreSection({
                         {[chef.area, chef.city].filter(Boolean).join(", ") || "City to confirm"}
                       </p>
                       <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        {formatLabel(chef.chef_role)}
+                        {titleCase(chef.chef_role)}
                       </p>
                     </div>
                   ))}
