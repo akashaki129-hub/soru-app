@@ -75,9 +75,15 @@ export async function loadPublicChefProspects() {
   const existing = ((listingsRes.data || []) as ChefInterestListing[]).filter(
     (row) => row.public_visible && ["submitted", "reviewing", "invited"].includes(row.status),
   );
-  const merged = [...existing];
-  const seen = new Set(existing.map((row) => listingKey(row.full_name, row.city)));
-  const seenLeadIds = new Set(existing.flatMap((row) => [row.id, row.lead_id].filter(Boolean)));
+  const merged: ChefInterestListing[] = [];
+  const seen = new Set<string>();
+  const seenLeadIds = new Set<string>();
+
+  for (const row of existing) {
+    seenLeadIds.add(row.id);
+    if (row.lead_id) seenLeadIds.add(row.lead_id);
+    addUnique(merged, seen, normalizeListingForDiscovery(row));
+  }
 
   for (const row of (enrollmentsRes.data || []) as ChefEnrollmentRow[]) {
     if (
@@ -100,7 +106,7 @@ export async function loadPublicChefProspects() {
       specialties: [formatLabel(row.role)],
       cuisines: [],
       signature_dish: null,
-      sample_menu: cleanText(row.comments),
+      sample_menu: null,
       expected_price_range: null,
       fssai_status: "need_guidance",
       public_visible: true,
@@ -163,7 +169,7 @@ export async function loadPublicChefProspects() {
       specialties: buildResearchSpecialties(row),
       cuisines: [],
       signature_dish: null,
-      sample_menu: cleanText(row.comments),
+      sample_menu: null,
       expected_price_range: null,
       fssai_status: row.chef_support_needs.includes("food_license")
         ? "need_guidance"
@@ -175,6 +181,17 @@ export async function loadPublicChefProspects() {
   }
 
   return merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+function normalizeListingForDiscovery(listing: ChefInterestListing): ChefInterestListing {
+  return {
+    ...listing,
+    sample_menu: shouldHideSampleMenu(listing) ? null : listing.sample_menu,
+  };
+}
+
+function shouldHideSampleMenu(listing: ChefInterestListing) {
+  return /^deepa\b/i.test(listing.full_name.trim());
 }
 
 function addUnique(rows: ChefInterestListing[], seen: Set<string>, listing: ChefInterestListing) {

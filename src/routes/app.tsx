@@ -575,6 +575,7 @@ function ExploreSection({
   const [view, setView] = useState<"all" | "registered" | "listed">("all");
   const shownRegistrations = view === "listed" ? [] : chefRegistrations;
   const shownChefs = view === "registered" ? [] : chefs;
+  const newestHomeChefs = shownRegistrations.slice(0, 3);
 
   return (
     <section className="mt-6 grid gap-6 lg:grid-cols-[18rem_1fr]">
@@ -632,6 +633,39 @@ function ExploreSection({
           />
         ) : (
           <>
+            {newestHomeChefs.length > 0 && (
+              <div className="rounded-3xl border border-primary/25 bg-[linear-gradient(135deg,rgba(255,184,0,0.16),var(--card))] p-5 shadow-soft md:p-6">
+                <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">
+                      Newly joined home chefs
+                    </p>
+                    <h3 className="mt-2 text-2xl font-semibold">
+                      Fresh chef interest now visible in Soru
+                    </h3>
+                  </div>
+                  <span className="rounded-full bg-background px-4 py-2 text-xs font-bold text-muted-foreground">
+                    Latest {newestHomeChefs.length}
+                  </span>
+                </div>
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  {newestHomeChefs.map((chef) => (
+                    <div
+                      key={`new-${chef.id}`}
+                      className="rounded-2xl border border-border/80 bg-background/80 p-4"
+                    >
+                      <p className="font-bold">{chef.kitchen_name || chef.full_name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {[chef.area, chef.city].filter(Boolean).join(", ") || "City to confirm"}
+                      </p>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        {formatLabel(chef.chef_role)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {shownRegistrations.map((chef) => (
               <article
                 key={chef.id}
@@ -678,10 +712,16 @@ function ExploreSection({
                   <StatusPill status={chef.status || "submitted"} />
                   <StatusPill status="contact_private" />
                 </div>
-                <div className="mt-5 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 text-sm text-muted-foreground">
-                  <span className="font-bold text-foreground">Sample menu:</span>{" "}
-                  {chef.sample_menu || "Menu to be published after onboarding."}
-                </div>
+                {chef.sample_menu ? (
+                  <div className="mt-5 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 text-sm text-muted-foreground">
+                    <span className="font-bold text-foreground">Sample menu:</span>{" "}
+                    {chef.sample_menu}
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-2xl border border-dashed border-primary/20 bg-background p-4 text-sm text-muted-foreground">
+                    Menu will be added after onboarding.
+                  </div>
+                )}
                 <p className="mt-3 text-xs text-muted-foreground">
                   Registration received. Soru will review food safety, menu details, and FSSAI
                   readiness before marking this chef verified.

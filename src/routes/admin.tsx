@@ -1908,7 +1908,7 @@ function buildChefLeadListings(
       specialties: [formatLabel(row.role)],
       cuisines: [],
       signature_dish: null,
-      sample_menu: cleanOptionalText(row.comments),
+      sample_menu: null,
       expected_price_range: null,
       fssai_status: "need_guidance",
       public_visible: true,
@@ -1949,7 +1949,7 @@ function buildChefLeadListings(
       specialties: buildResearchSpecialties(row),
       cuisines: [],
       signature_dish: null,
-      sample_menu: cleanOptionalText(row.comments),
+      sample_menu: null,
       expected_price_range: null,
       fssai_status: row.chef_support_needs.includes("food_license")
         ? "need_guidance"
